@@ -858,7 +858,7 @@ void* operator new[](std::size_t size, const char* file, int line);
 
 #### 2.1 构造析构能否为虚？
 
-构造函数不能是虚函数，析构函数可以是虚函数（父类的析构函数需定义为虚函数）。
+构造函数不能是虚函数，**析构函数可以是虚函数**（父类的析构函数需定义为虚函数）。
 
 （1）从存储空间角度上来看：如果构造函数是虚函数，就需要通过虚表来调用。而**虚表是存储在对象的内存空间**的，调用构造函数前对象还没有实例化出来，也就是内存空间还没有，无法找到虚表。所以，在构造出对象前是不能调用虚函数的。
 
@@ -905,7 +905,7 @@ void* operator new[](std::size_t size, const char* file, int line);
 
   ![image-20210830174257162](https://i.loli.net/2021/08/30/uzfZIGyCQnDcHE8.png)
 
-  我试了以下，虚函数是内联函数时仍然能正确地动态绑定，为什么呢？
+  我试了一下，虚函数是内联函数时仍然能正确地动态绑定，为什么呢？
 
   原因是：**即使虚函数被声明为了内联函数，编译器遇到这种情况根本不会将这样的函数内联展开，而是当作普通函数来处理。**
 
@@ -2060,7 +2060,7 @@ int &r1 = a;         // ×
       char b;       // 1
       short int c;  // 2
       int d;        // 4
-}test_struct;           
+  }test_struct;           
   sizeof(test_struct);       // 12
   
   #pragma pack(n)表示，我们结构体成员所占用内存的起始地址需要是n的整数倍。
@@ -2149,6 +2149,96 @@ if (*p == 1)
 else
     cout << "big-endian" << endl;     // 4个字节（从低地址到高地址）0 0 0 1（大端）
 ```
+
+### 26.成员函数的操作符重载
+
+操作符重载分为成员操作符重载（number function）和非成员操作符重载（non-number functon），并不是所有的操作符都可以进行非成员函数操作符重载的，具体可以参考官网：http://www.cplusplus.com/doc/tutorial/templates/
+```c++
+
+#include <iostream>
+using namespace std;
+ 
+class complex
+{
+private:
+    int re;
+    int im;
+public:
+    complex(int r ,int i ); //错误写法， complex(int r = 0,int i = 0 );
+    ~complex();
+    inline int real() const { return re;} //内联函数
+    inline int imag() const { return im;}
+    complex  operator+ (complex &n);
+ 
+};
+ 
+complex::complex(int r = 0 ,int i = 0 )
+    : re (r),im (i)   //构造函数的初始化列表
+{
+    //re = r;
+    //im = i;
+}
+ 
+complex::~complex()
+{
+}
+ 
+complex  complex::operator+ (complex &n)//成员函数的操作符重载
+{
+    return complex (this->real() + n.real(),this->imag() + n.imag());   
+}
+ 
+ostream & operator<<(ostream &os,complex &n)//非成员函数的操作符重载
+{
+    os << n.real() << "+" << n.imag() << "i";
+    return os; 
+}
+ 
+main()
+{
+    complex a(4,5);
+    complex b(1,1);
+    complex c = a+b;
+    cout << c << endl;
+    return 0;
+}
+```
+
+上个博客说过，成员函数的操作符重载就好比是一个函数，造作符左右两个变量，分别对应函数的第一个和第二个形参，这样是很容易理解的。但是成员函数的操作符重载函数只有一个参数，这就十分奇怪啦。其实编译器在编译到成员函数的时候，会做如下操作：
+
+```c++
+class a;
+class b;
+class c;
+ 
+c = a + b;//编译前
+// c = a.operator+b;//编译后
+```
+
+这样就容易理解多了，基于这种原因，成员函数操作符重载的写法有很多种，如下：
+
+```c++
+complex  complex::operator+ (complex &n)
+{
+    return complex (this->real() + n.real(),this->imag() + n.imag());   
+}
+
+complex  complex::operator+ (complex &n)
+{
+    return complex (real() + n.real(),imag() + n.imag());   
+}
+
+complex  complex::operator+ (complex &n)
+{
+    return complex (re + n.re,im + n.im);   
+}
+```
+
+对上面三段代码进行一下解释：
+
+1. complex()，这个是创建了一个临时对象，临时对象没有名字，用来传值之后就会死亡。因此这里的函数返回用的是传值，而非传引用。
+2. n.re，第三种我写了这种形式，对于private中的成员变量来说，我们在正常使用是不能这样写的，但是在定义成员函数就可以这样使用。
+3. 第一种方法我们引入了this指针，之后我们会再来做探讨。
 
 
 
