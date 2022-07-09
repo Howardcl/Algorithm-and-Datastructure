@@ -1947,15 +1947,248 @@ int main()
 
 ### 17. static
 
-（1）static 修饰类成员数据：表示该数据属于整个类，实例化对象之前就可以访问。禁止在类内初始化（如果在类内初始化，会导致每个对象都包含该静态成员，所以不允许），类外初始化时不必再加 static 关键字（类外函数加 static 表示限定函数的作用域仅限本文件）
+（1）static 修饰类成员数据：表示该数据属于整个类，实例化对象之前就可以访问。禁止在类内初始化（如果在类内初始化，会导致每个对象都包含该静态成员，所以不允许），**类外初始化时不必再加 static 关键字**（类外函数加 static 表示限定函数的作用域仅限本文件）
 
-（2）修饰类成员函数： 该函数在实例化对象前就能访问，函数内不能访问非静态的成员数据和调用非静态的成员函数
+**static修饰的变量先于对象存在，所以static修饰的变量要在类外初始化。因为static是所有对象共享的变量，必须要比对象先存在。**
+
+例如:
+
+```c++
+ class Text  
+ {  
+      public:  
+      static int count;  
+  };  
+    
+  int Text::count=0;//用static成员变量必须要初始化   
+    
+  int main()  
+ {  
+     Text t1;  
+     Text t2;  
+       
+     t1.count = 100;     //t1对象把static成员count改为100   
+     cout<<t2.count<<endl; //当t2对象打印static成员的时候，显示的是100而不是0   
+     return 0;  
+ }  
+```
+
+好处：
+
+用static修饰的成员变量在对象中是不占内存的，因为他不是跟对象一起在堆或者栈中生成，用static修饰的变量在静态存储区生成的。所以用static修饰一方面的好处：**是可以节省对象的内存空间。**如同你创建100个Person对象，而这100个对象都有共有的一个变量，例如叫国籍变量，就是Person对象的国籍都是相同的。那如果国籍变量用static修饰的话，即使有100个Person对象，也不会创建100个国籍变量，只需要有一个static修饰的国籍变量就可以了。这100个对象要用的时候，就会去调用static修饰的国籍变量。否则有100个Person变量，就会创建100个国籍变量，在国籍变量都是相同的情况下，就等于浪费空间了。
+
+
+（2）修饰类成员函数： 该函数在实例化对象前就能访问，static函数内不能访问非静态的成员数据和调用非静态的成员函数
+
+由于static修饰的[类成员](https://so.csdn.net/so/search?q=类成员&spm=1001.2101.3001.7020)属于类，不属于对象，因此static类成员函数是没有this指针的，this指针是指向本对象的指针。正因为没有this指针，所以static类成员函数不能访问非static的类成员，只能访问 static修饰的类成员。
+
+```cpp
+class Text  
+  {  
+      public:  
+      static int fun()  
+      {  
+          return num;  
+      }  
+      static int count;  
+      int num;  
+ };  
+ int Text::count=5;//用static成员变量必须要初始化   
+   
+ int main()  
+ {  
+     Text t1;  
+     Text t2;  
+     t1.num=100;  
+       
+     t1.fun();//发生错误，fun函数return的是非static类成员 如果return count就正确   
+     return 0;  
+ }  
+```
 
 （3）修饰局部变量：延长局部变量的声明周期，直到程序运行结束以后才释放、
 
 （4）修饰全局变量：限定该变量只能在本文件中访问，即便是extern外部声明也不可以在其他文件中访问
 
 （5）修饰函数：限定该函数只能在本文件中调用，不能被其他文件调用
+
+**static在单例模式中也有应用。**
+
+所谓单例就是一个类只能被实例化一次，主要有两种实现方法：
+
+1. 在类使用之前，就将类实例化，也叫饿汉模式。利用静态对象
+
+2. 使用到类时，才进行实例化，也叫懒汉模式。利用静态对象指针
+
+   **第一种饿汉模式：**
+
+```c++
+#include <iostream>
+using namespace std;
+
+class Singleton
+{
+  private:
+    Singleton(){
+        cout << "构造" << endl;
+        num = 10;
+    }
+    ~Singleton(){
+        cout << "析构" << endl;
+    }
+    int num;
+    static Singleton locla_s;//静态类成员
+  public:
+    static Singleton *getInstance()
+    {
+        return &locla_s;
+    }
+    void Print()
+    {
+    	std::cout << num << std::endl;
+    }	
+};
+
+Singleton Singleton::locla_s;//值得注意的地方 需要在类外对静态类成员初始化
+
+int main()
+{
+    Singleton* P_Singleton = Singleton::getInstance();
+    P_Singleton->Print();
+	return 0;
+}
+```
+
+结果：
+
+```c++
+构造
+析构
+```
+
+
+改变主函数：
+
+```c++
+int main()
+{
+    Singleton * s2 = Singleton::getInstance();
+    cout << s2 << endl;
+    Singleton * s3 = Singleton::getInstance();
+    cout << s3 << endl;
+    return 0;
+}
+```
+
+结果：
+
+```c++
+构造
+0x601191
+0x601191
+析构
+```
+
+结论：
+
+可见这种方式，即便主函数中没有对这个类有任何操作，也会在进入主函数之前启动构造函数，在退出主函数之前启动析构造函数。在主函数中多次创建指针相同，表明是同一个实例化对象。
+
+**懒汉模式：**
+
+```c++
+#include <iostream>
+using namespace std;
+
+class Singleton
+{
+  private:
+    static Singleton *local_instance;
+    Singleton(){cout  << "构造" << endl;}
+    ~Singleton(){cout  << "析构" << endl;}
+
+  public:
+    static Singleton *getInstance()
+    {
+        if (local_instance == nullptr)
+        {
+            local_instance = new Singleton();
+            cout << "new 新空间" << endl;
+        }
+        else
+        {
+            cout << "空间不变" << endl;
+        }
+        
+
+        return local_instance;
+    }
+    static void delete_local()
+    {
+        delete local_instance;
+    }
+
+};
+
+Singleton * Singleton::local_instance = nullptr;//值得注意
+
+
+int main() 
+{    
+    // Singleton * s1 = Singleton::getInstance();
+    // Singleton * s2 = Singleton::getInstance();
+    // Singleton::delete_local();
+    return 0;
+}
+```
+
+结果：
+
+没有任何输出结果
+修改主函数：
+
+```c++
+int main() 
+{    
+    Singleton * s1 = Singleton::getInstance();
+    Singleton * s2 = Singleton::getInstance();
+    // Singleton::delete_local();
+    return 0;
+}
+```
+
+结果：
+
+```c++
+构造
+new 新空间
+空间不变
+```
+
+继续修改主函数：
+
+```c++
+int main() 
+{    
+    Singleton * s1 = Singleton::getInstance();
+    Singleton * s2 = Singleton::getInstance();
+    Singleton::delete_local();
+    return 0;
+}
+```
+
+结果：
+
+```c++
+构造
+new 新空间
+空间不变
+析构
+```
+
+结论：
+
+懒汉模式中，主函数中没有对这个类操作时，不会调用构造函数。在第一次调用是new新空间，调用构造函数，但是由于new的空间没有delete，所以无法调用析构函数。进一步修改主函数之后，就可以进行析构了。
+
 
 ### 18. const
 
@@ -2331,8 +2564,6 @@ main()
 ```
 
 总结：在C++程序的编写过程中，尽可能采用引用的方式，因为引用既有良好的接口性（在调用函数时，用户不用搞清楚函数是传值还是传引用，只需要传入变量名就可以，如果为了保证原变量不被修改可以用const来修饰。）又有很好的效率（传引用的复杂度只是传递了一个指针，而不是传递整包数据。）
-
-
 
 ## 五. 操作系统
 
