@@ -2153,6 +2153,9 @@ else
 ### 26.成员函数的操作符重载
 
 操作符重载分为成员操作符重载（number function）和非成员操作符重载（non-number functon），并不是所有的操作符都可以进行非成员函数操作符重载的，具体可以参考官网：http://www.cplusplus.com/doc/tutorial/templates/
+
+简单代码示例如下：
+
 ```c++
 
 #include <iostream>
@@ -2200,6 +2203,7 @@ main()
     complex b(1,1);
     complex c = a+b;
     cout << c << endl;
+    //cout << a+b << endl; a+b，这样的语句创建的是一个临时对象，我们可以进行传值、赋值的操作，但是不能传引用。所以用临时对象的方式会报错。
     return 0;
 }
 ```
@@ -2239,6 +2243,94 @@ complex  complex::operator+ (complex &n)
 1. complex()，这个是创建了一个临时对象，临时对象没有名字，用来传值之后就会死亡。因此这里的函数返回用的是传值，而非传引用。
 2. n.re，第三种我写了这种形式，对于private中的成员变量来说，我们在正常使用是不能这样写的，但是在定义成员函数就可以这样使用。
 3. 第一种方法我们引入了this指针，之后我们会再来做探讨。
+
+### 27.C++中传值、传引用、传地址
+
+1. 传值：只是利用了原变量的值，不会对原变量有任何影响。
+2. 传引用：相当于给原变量起了个别名，原变量和新变量对应同一个值，因此对新变量的操作会影响到原变量。
+3. 传地址：其实还是一种传值的操作，特殊的地方是传递的值是原变量的地址,由于这个地址指向原变量，所以通过这个地址可以改变原变量的值。
+
+**传地址：**
+
+```c++
+#include <iostream>
+using namespace std;
+ 
+int use_pointer(int *p)
+{
+    *p += 1;
+    cout << *p <<endl;
+    return *p;
+}
+ 
+main()
+{
+    int a = 6;
+    cout << a << endl;
+    int b = use_pointer(&a);
+    return 0;
+}
+```
+
+输出结果
+
+```c++
+a的值是6
+a的值是7
+```
+
+**传值**：
+
+```c++
+#include <iostream>
+using namespace std;
+ 
+int use_value(int n)
+{
+    n += 1;
+    return n;
+}
+ 
+main()
+{
+    int a = 6;
+    cout << "a的值是" << a << endl;
+    int b = use_value(a);
+    cout << "a的值是" << a << endl;
+    return 0;
+}
+```
+
+输出结果：
+
+```c++
+a的值是6
+a的值是6
+```
+
+**传引用：**
+
+```c++
+#include <iostream>
+using namespace std;
+ 
+int use_reference(int &n)
+{
+    n += 1;
+    return n;
+}
+ 
+main()
+{
+    int a = 6;
+    cout << "a的值是" << a << endl;
+    int b = use_reference(a);
+    cout << "a的值是" << a << endl;
+    return 0;
+}
+```
+
+总结：在C++程序的编写过程中，尽可能采用引用的方式，因为引用既有良好的接口性（在调用函数时，用户不用搞清楚函数是传值还是传引用，只需要传入变量名就可以，如果为了保证原变量不被修改可以用const来修饰。）又有很好的效率（传引用的复杂度只是传递了一个指针，而不是传递整包数据。）
 
 
 
