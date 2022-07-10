@@ -1491,9 +1491,179 @@ ostream& operator<<(ostream& os, const String& str) {
 
 ### 8. `explict`
 
-- #### 为何尽量使用 `explict` 关键字？
+转换函数，其实我们一直都在使用，知识没有注意到而已。比如，我们将一个int变量和double变量相加时，编译器会将int转换成double,然后再让两个double相加。那么我们是否可以将一个类对象转换成其他对象呢？答案是可以的，而且这里的其他对象既可以是int这样的内置类型，也可以是我们定义的另一个类。
 
-  使用`explicit`可以禁止编译器自动调用拷贝初始化，还可以禁止编译器对构造函数的参数进行隐式转换。在`c++`中`explicit`关键字只能用来修饰**构造函数**。
+```c++
+#include<iostream>
+using namespace std;
+class Fraction
+{
+	public:
+	    Fraction(int num,int den = 1):m_numerator(num),m_denominator(den) { }	
+		int get_m_n() const {return 	m_numerator;}
+	    int get_m_d() const {return 	m_denominator;}
+		Fraction& operator+(const Fraction& f){
+			int m_n;
+			int m_d;
+			m_n = m_numerator*f.m_denominator + m_denominator*f.m_numerator;
+			m_d = m_denominator*f.m_denominator;
+			m_numerator = m_n;
+			m_denominator = m_d; 
+			return *this;
+		} 
+	private:
+		int m_numerator;
+		int m_denominator;
+} ;
+ 
+ostream& operator<< (ostream& os,const Fraction& f){
+	os << f.get_m_n() << '/' << f.get_m_d();
+	return os;
+}
+ 
+int main(){
+	Fraction i(2,5); 
+	Fraction f = i + 4;
+	cout << f << endl;
+	return 0;
+} 
+```
+
+结果：
+
+```c++
+22/5
+```
+
+分析：可见在   Fraction f = i + 4;这句中[编译器](https://so.csdn.net/so/search?q=编译器&spm=1001.2101.3001.7020)就将4转换了一个Fraction类。
+
+那要怎么样才能避免编译器做出这样的转换了，那就是用explicit关键字来修饰构造函数。
+
+```c++
+explicit Fraction(int num,int den = 1)
+		  :m_numerator(num),m_denominator(den) { }	
+```
+
+第二个问题来了，我们怎么将Fraction这个类转换成int这样的变量呢，这样的转换函数就要我们自己来写啦。
+
+```c++
+#include<iostream>
+using namespace std;
+class Fraction
+{
+	public:
+	    explicit Fraction(double num,double den = 1)
+		  :m_numerator(num),m_denominator(den) { }	
+		double get_m_n() const {return 	m_numerator;}
+	    double get_m_d() const {return 	m_denominator;}
+		Fraction& operator+(const Fraction& f){
+			double m_n;
+			double m_d;
+			m_n = m_numerator*f.m_denominator + m_denominator*f.m_numerator;
+			m_d = m_denominator*f.m_denominator;
+			m_numerator = m_n;
+			m_denominator = m_d; 
+			return *this;
+		} 
+		operator double() const {
+			return (double) (m_numerator/m_denominator);
+		}
+	private:
+		double m_numerator;
+		double m_denominator;
+} ;
+ 
+ostream& operator<< (ostream& os,const Fraction& f){
+	os << f.get_m_n() << '/' << f.get_m_d();
+	return os;
+}
+ 
+int main(){
+	Fraction i(2,5); 
+	cout << i << endl;
+	double n = i + 4;
+	cout << n << endl;
+	return 0;
+} 
+```
+
+转换函数还可以完成两个类之间的转化：
+
+```c++
+#include<iostream>
+using namespace std;
+ 
+class complex {
+	private :
+		double re;
+		double im;
+	public :
+		complex(double r,double i){
+			re = r;
+			im = i;
+		}
+		double get_re() const {return re;}
+		double get_im() const {return im;}
+};
+ 
+ 
+class Fraction
+{
+	public:
+	    explicit Fraction(double num,double den = 1)
+		  :m_numerator(num),m_denominator(den) { }	
+		double get_m_n() const {return 	m_numerator;}
+	    double get_m_d() const {return 	m_denominator;}
+		Fraction& operator+(const Fraction& f){
+			double m_n;
+			double m_d;
+			m_n = m_numerator*f.m_denominator + m_denominator*f.m_numerator;
+			m_d = m_denominator*f.m_denominator;
+			m_numerator = m_n;
+			m_denominator = m_d; 
+			return *this;
+		} 
+		operator complex() const {
+			return complex(m_numerator,m_denominator);
+		}
+	private:
+		double m_numerator;
+		double m_denominator;
+} ;
+ 
+ostream& operator<< (ostream& os,const Fraction& f){
+	os << f.get_m_n() << '/' << f.get_m_d();
+	return os;
+}
+ 
+ 
+ostream& operator<< (ostream& os,const complex& c){
+	os << c.get_re() << '+' << c.get_im() << "i";
+	return os;
+}
+ 
+ 
+int main(){
+	Fraction i(2,5); 
+	cout << i << endl;
+	complex n = i ;
+	cout << n << endl;
+	return 0;
+} 
+```
+
+输出结果：
+
+```c++
+2/5
+2+5i
+```
+
+
+
+为何尽量使用 `explict` 关键字？
+
+- 使用`explicit`可以禁止编译器自动调用拷贝初始化，还可以禁止编译器对构造函数的参数进行隐式转换。**在`c++`中`explicit`关键字只能用来修饰构造函数。**
 
 - #### 什么是拷贝初始化？
 
@@ -2192,7 +2362,7 @@ new 新空间
 
 ### 18. const
 
-（1）修饰普通变量，创建时必须初始化，限定变量不可修改（一旦创建就不能再修改）。）
+（1）修饰普通变量，创建时必须初始化，限定变量不可修改（一旦创建就不能再修改。）
 
 ```C++
 int a = 2, b = 3;
@@ -2215,7 +2385,9 @@ int &r1 = a;         // ×
 
 （3）修饰函数返回值，常用于运算符重载，使函数调用表达式不能作为左值。
 
-（4）放在类的成员函数后面，修饰类的成员函数，限定在该函数内不能修改对象的数据成员，并且不能调用非 const 函数（因为非 const 函数可能修改数据成员，而 const 成员函数是不能修改数据成员的，所以在 const 函数中只能调用 const 函数）。静态函数没有this指针，不能定义为虚函数。
+（4）放在类的成员函数后面，**修饰类的成员函数，限定在该函数内不能修改对象的数据成员，**并且不能调用非 const 函数（因为非 const 函数可能修改数据成员，而 const 成员函数是不能修改数据成员的，所以在 const 函数中只能调用 const 函数）。静态函数没有this指针，不能定义为虚函数。
+
+const除了修饰函数时放在函数后面，其他时候都是放在前面的。
 
 
 
@@ -2564,6 +2736,184 @@ main()
 ```
 
 总结：在C++程序的编写过程中，尽可能采用引用的方式，因为引用既有良好的接口性（在调用函数时，用户不用搞清楚函数是传值还是传引用，只需要传入变量名就可以，如果为了保证原变量不被修改可以用const来修饰。）又有很好的效率（传引用的复杂度只是传递了一个指针，而不是传递整包数据。）
+
+### 28.关于typename和size_t
+
+```c++
+typedef  typename std::vector<T>::size_type size_type;
+```
+
+c++ premier中多次出现上面的代码，让人看了似曾相识，但是有觉得什么都不是，因为这里包含了好几个知识点，让我来慢慢解答。
+1.独立于对象存在的类成员
+首先来看这句：
+
+```c++
+std::vector<T>::size_type
+要想知道上面的代码什么意思，当我们看一下STL中vector类是怎么写的就明白啦：
+
+template <class T,class Alloc=alloc>
+class vector{
+public:
+    //...
+    typedef size_t size_type;
+    //...
+};
+```
+
+其实`size_type`就是`size_t`（size_t是什么，下面会讲到）。
+
+`std::vector<T>::size_type`，这种直接用类名加成员的写法，让我想起来了类静态变量，类静态函数的用法。（静态变量，静态函数可以看我关于static的博客）。于是我做了总结；
+
+```
+静态数据成员 
+静态成员函数 
+嵌套类型
+```
+
+上面这三种情况，**都可以用类名加成员的写法来用**， `typedef size_t size_type;`这句话就是嵌套类型，`std::vector<T>::size_type`，这句就是引用，显然它是独立于对象存在的类成员。
+
+**typename**
+那么问题就来了，上面三种类型都可以用`std::vector<T>::size_type`这种形式来引用，那么编译器要怎么才能分清这个是类的嵌套类型，还是静态数据成员呢？我们就用typename来告诉编译器我这个是一个嵌套类型，这样就解决了定义不明确的问题了。
+
+**size_t**
+这是一个很重要的概念，网上也有很多解释，但是写的是云里雾里的，我就说一下我的理解：
+
+```c++
+template <typename T>
+class Blob{
+	public:
+		typedef T value_type;
+		typedef  typename std::vector<T>::size_type size_type;
+		Blob();
+		Blob(std::initializer_list<T> il) :data(make_shared<std::vector<T>>(il)) {}
+		size_type size() const { return data->size();}
+		bool empty() const { return data->empty();}
+		void push_back(const T& t) {data->push_back(t);}
+	private:
+		std::shared_ptr<std::vector<T>> data;
+};
+```
+
+这c++ premier中的一段代码，其实我们在STL经常见到size_type而很少见到size_t，经过上面的解释我们就知道了，size_type只是size_t的一个别名，其实是一个东西。上面的代码我们可以看到size_type作为vector的size()返回类型，这也是size_type最常用的一种用法，下面继续解释。
+
+```c++
+int A[i];
+std::vector<int> V[i];
+```
+
+如上面例子，大家有没有想过一个数组，一个vector最多有几个元素，这就跟i是什么类型有关了，先告诉你，i的类型就是size_t（很多地方说size_t就是unsigned int，但是这不重要），也就是说，我们抽象出来一个类型size_t专门来表示一个序列对象的元素的多少（有人说这与地址的位数有关，但是这也不重要）。我们这样抽象出来的size_t类型有很多好处：
+
+1. 增加程序的可移植性。不同的环境下int 或者unsigned int这些内置类型的字节数是不同的，如果我们用int定义了数组的大小，而用unsigned int去索引，在我们的环境中程序可以运行，但是换了环境可能就会出现bug
+2. 如果size_t报错，我们立刻就知道是数组大小出了问题。
+
+### 29.c++中的初始化
+
+```c++
+#include<iostream>
+using namespace std;
+ 
+class complex{
+	private:
+		int re;
+		int im;
+	public:
+		complex(int r,int i) :re(r), im(i) { }
+};
+ 
+int main(){
+	
+	int i = 0;
+	int j(0);
+	complex c(3,4);
+	return 0;
+}
+```
+
+从c语言过来的同学，在初始化的时候我们用的都是等号“=”，然而c++其实已经不再使用这种方式来初始化啦，**因为作为面向对象的语言，对象往往比较复杂，很少只包含单值的**，之所以在现在还能看到c++中还有这样使用的，是因为为了兼容c语言。之前对构造函数的初始化列表的写法，表示很困惑，现在明白啦。这才是c++真正的初始化方式。
+
+### 30.文件读写
+
+```c++
+#include<iostream>
+#include<fstream>
+ 
+using namespace std;
+ 
+int main(){
+	string str;
+	int n;
+	int m;
+	ofstream outfile("my_file.txt");
+	if(outfile){
+			outfile << "helloworld!" << " " << 1 << " " << 2 << endl;
+			outfile << "hello!" << " " << 3 << " " << 4 << endl;
+			outfile << "world!" << " " << 5 << " " << 6 << endl;
+	}
+	else{
+		cout << "error:failed to open file!" << endl;
+	}
+	
+	ifstream infile("my_file.txt");
+	
+	while(infile >> str){
+		infile >> n;
+		infile >> m;
+		cout << str << "  " << n << "  " << m << endl;
+	}
+	
+	return 0;
+}
+```
+
+结果：
+
+```c++
+helloworld!  1  2
+hello!  3  4
+world!  5  6
+```
+
+解释：
+
+上面的代码主要用了两个类，ofstream和ifstream,都存在头文件#include<fstream>里。
+
+```c++
+ofstream outfile("my_file.txt");
+```
+
+这句话的作用就是，定义一个名叫outfile的对象，并打开“my_file。txt”文件，如果程序找不到这个文件就会新建这个文件，这种打开文件的方式会将文件之前的内容给全部清空，如果想要保留文件的内容，并且添加新的内容，就需要用append模式，应该这样写：
+
+```c++
+ofstream outfile("my_file.txt",ios_base::app);
+```
+
+如果成功打开文件，outfile = true,如果打开失败，outfile = flase.写文件的操作类似于std::cout的操作。
+
+值得注意的是，endl，会插入一个换行。
+
+```c++
+if(outfile){
+			outfile << "helloworld!" << " " << 1 << " " << 2 << endl;
+			outfile << "hello!" << " " << 3 << " " << 4 << endl;
+			outfile << "world!" << " " << 5 << " " << 6 << endl;
+	}
+	else{
+		cout << "error:failed to open file!" << endl;
+	}
+```
+
+对于读文件，；类似于std::cin的操作，值得注意的是，infile >> str ,返回的是写入的字符，文档结尾为0，返回的也是0
+
+```c++
+ifstream infile("my_file.txt");
+while(infile >> str){
+	infile >> n;
+	infile >> m;
+	cout << str << "  " << n << "  " << m << endl;
+}
+```
+
+
 
 ## 五. 操作系统
 
