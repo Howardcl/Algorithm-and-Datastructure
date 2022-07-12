@@ -3058,10 +3058,237 @@ while(infile >> str){
 (1)单位时间内处理任务频繁而且任务处理时间短
 (2)对实时性要求较高。如果接受到任务后在创建线程，可能满足不了实时要求，因此必须采用线程池进行预创建。
 
+### 35.c++ 多线程---线程安全
+
+当使用多线程时，可能存在同时访问一个变量，导致变量被污染问题，所以需要通过编程克服这个问题。
+
+**同时访问一个数据示例**
+
+采用多个线程，分别记数，然后查看最终计算结果，代码如下：
+
+```c++
+#include <iostream>
+#include <thread>
+#include <time.h>
+
+//计数全局变量
+long cnt = 0;
+
+//计数程序
+void counter()
+{
+	for (int i = 0; i < 100000; ++i)
+	{
+		++cnt;
+	}
+}
+
+int main(int argc, char* argv[])
+{
+	//开始计时
+	clock_t start = clock();
+
+	//创建线程
+	std::thread threads[100];
+
+	//调用记数函数
+	for (int i = 0; i != 100; ++i)
+	{
+		threads[i] = std::thread(counter);//往线程中塞入任务函数
+	}
+
+	//等待操作
+	for (auto& th : threads)
+		th.join();
+
+	clock_t finish = clock();
+
+	std::cout << "期望结果：" << 100 * 100000 << std::endl;
+	std::cout << "实际结果:" << cnt << std::endl;
+	std::cout << "duration:" << finish - start << "ms" << std::endl;
+	
+	return 0;
+}
+
+```
+
+运行结果：
+
+```c++
+期望结果：10000000
+实际结果: 9400000
+duration:104ms
+```
+
+可以看出，存在数据丢失问题，其原因是同时访问变量cnt导致，所以，需要采用编程方法，保证每次只能有一个程序访问cnt变量。
+
+**采用互斥锁mutex**
+在 C++11中，mutex是标准库， 调用`#include < mutex>`头文件调用，其主要类为std::mutex，其成员函数包括:
+
+**1.构造函数**
+构造函数，std::mutex不允许拷贝构造，也不允许 move 拷贝，最初产生的 mutex 对象是处于 unlocked 状态的。
+
+**2.lock()函数**
+lock()，调用线程将锁住该互斥量。线程调用该函数会发生下面 3 种情况：
+(1). 如果该互斥量当前没有被锁住，则调用线程将该互斥量锁住，直到调用 unlock之前，该线程一直拥有该锁。
+(2). 如果当前互斥量被其他线程锁住，则当前的调用线程被阻塞住。
+(3). 如果当前互斥量被当前调用线程锁住，则会产生死锁(deadlock)。
+
+**3.unlock()函数**
+unlock()， 解锁，释放对互斥量的所有权。
+
+**4.try_lock()函数**
+try_lock()，尝试锁住互斥量，如果互斥量被其他线程占有，则当前线程也不会被阻塞。线程调用该函数也会出现下面 3 种情况：
+(1). 如果当前互斥量没有被其他线程占有，则该线程锁住互斥量，直到该线程调用 unlock 释放互斥量。
+(2). 如果当前互斥量被其他线程锁住，则当前调用线程返回 false，而并不会被阻塞掉。
+(3). 如果当前互斥量被当前调用线程锁住，则会产生死锁(deadlock)。
+互斥变量参照：c++ 11 多线线程系列-----------原子操作（atomic operation)
+
+示例代码如下：
+
+```c++
+#include <iostream>
+#include <thread>
+#include <time.h>
+#include <mutex> //添加互斥变量头文件
+
+//创建互斥变量锁
+std::mutex my_mutex;
+
+
+//计数全局变量
+long cnt = 0;
+
+//计数程序
+void counter()
+{
+	for (int i = 0; i < 100000; ++i)
+	{
+		//每次计算锁住变量
+		my_mutex.lock();
+		++cnt;
+		my_mutex.unlock();
+	}
+}
+
+
+int main(int argc, char* argv[])
+{
+	//开始计时
+	clock_t start = clock();
+
+	//创建线程
+	std::thread threads[100];
+
+	//调用记数函数
+	for (int i = 0; i != 100; ++i)
+	{
+		threads[i] = std::thread(counter);
+	}
+
+	//等待操作
+	for (auto& th : threads)
+		th.join();
+
+	clock_t finish = clock();
+
+	std::cout << "期望结果：" << 100 * 100000 << std::endl;
+	std::cout << "实际结果:" << cnt << std::endl;
+	std::cout << "duration:" << finish - start << "ms" << std::endl;
+	
+	return 0;
+}
+```
+
+计算结果如下：
+
+```c++
+期望结果：10000000
+实际结果:10000000
+duration:456ms
+```
+
+采用互斥变量后，能准确计算，但是时间从104ms,变到456ms。
+
+**采用原子原子操作atomic**
+atomic是C++标准程序库中的一个头文件，定义了C++11标准中的一些表示线程、并发控制时原子操作的类与方法等。此头文件主要声明了两大类原子对象：`std::atomic`和`std::atomic_flag`，另外还声明了一套C风格的原子类型和与C兼容的原子操作的函数。在多线程并发执行时，原子操作是线程不会被打断的执行片段。一些程序设计更为注重性能和效率，需要开发lock-free的算法和数据结构，这就需要更为底层的原子操作与原子类型。原子类型对象的主要特点就是从不同线程并发访问是良性(well-defined)行为，不会导致竞争危害。与之相反，不做适当控制就并发访问非原子对象则会导致未定义(undifined)行为。
+
+**atomic_flag类：**
+atomic_flag类是一种简单的原子布尔类型，只支持两种操作：test_and_set(flag=true)和clear(flag=false)。跟std::atomic的其它所有特化类不同，它是锁无关的。结合std::atomic_flag::test_and_set()和std::atomic_flag::clear()，std::atomic_flag对象可以当作一个简单的自旋锁(spin lock)使用。
+(1) `atomic_flag`只有默认构造函数，禁用拷贝构造函数，禁用移动构造函数实，如果在初始化时没有明确使用宏ATOMIC_FLAG_INIT初始化，那么新创建的std::atomic_flag对象的状态是未指定的(unspecified)，既没有被set也没有被clear；如果使用该宏初始化，该std::atomic_flag对象在创建时处于clear状态。
+(2) `test_and_set`：返回该std::atomic_flag对象当前状态，检查flag是否被设置，若被设置直接返回true，若没有设置则设置flag为true后再返回false，该函数是原子的。
+(3) `clear`：清除std::atomic_flag对象的标志位，即设置atomic_flag的值为false。
+
+**std::atomic类模板：**
+`std::atomic`比`std::atomic_flag`功能更加完善。C++11标准库std::atomic提供了针对bool类型、整形(integral)和指针类型的特化实现。每个std::atomic模板的实例化和完全特化定义一个原子类型。若一个线程写入原子对象，同时另一个线程从它读取，则行为良好定义。而且，对原子对象的访问可以按std::memory_order所指定建立线程间同步，并排序非原子的内存访问。std::atomic可以以任何复制(Trivially Copyable)的类型T实例化。std::atomic既不可复制亦不可移动
+
+**原子对象初始化相关的两个宏：**
+(1) ATOMIC_VAR_INIT(val)：初始化std::atomic对象。
+(2) ATOMIC_FLAG_INIT：初始化std::atomic_flag对象。
+示例代码：
+
+```c++
+#include <iostream>
+#include <thread>
+#include <time.h>
+#include <atomic> //添加原子操作头文件
+
+//创建原子操作变量
+std::atomic_long cnt;
+
+
+//计数程序
+void counter()
+{
+	for (int i = 0; i < 100000; ++i)
+	{
+		++cnt;
+	}
+}
+
+
+int main(int argc, char* argv[])
+{
+	//开始计时
+	clock_t start = clock();
+
+	//创建线程
+	std::thread threads[100];
+
+	//调用记数函数
+	for (int i = 0; i != 100; ++i)
+	{
+		threads[i] = std::thread(counter);
+	}
+
+	//等待操作
+	for (auto& th : threads)
+		th.join();
+
+	clock_t finish = clock();
+
+	std::cout << "期望结果：" << 100 * 100000 << std::endl;
+	std::cout << "实际结果:" << cnt << std::endl;
+	std::cout << "duration:" << finish - start << "ms" << std::endl;
+	
+	return 0;
+}
+```
+
+运行结果：
+
+```c++
+期望结果：10000000
+实际结果:10000000
+duration:228ms
+```
+
+结果表明，采用原子变量能保证运算结果正确，且能相对于互斥变量mutex,运算速度明显提高。
 
 
 
-## 五. 操作系统
+
+## 四. 操作系统
 
 ### 1. I/O模型
 
@@ -3995,7 +4222,7 @@ Linux 下常用的性能分析工具，能实时显示系统中进程的资源�
 
 **第七行以下：各进程（任务）的状态监控**
 
-## 六. 计算机网络
+## 五. 计算机网络
 
 ### 1. 分层模型
 
