@@ -3330,6 +3330,525 @@ duration:228ms
 - **在什么线程环境下调用了这个函数？**上面说了必须要等线程方法执行完毕后才能返回，那必然是阻塞调用线程的，也就是说如果一个线程对象在一个线程环境调用了这个函数，那么这个线程环境就会被阻塞，直到这个线程对象在构造时传入的**方法**执行完毕后，才能继续往下走，另外如果线程对象在调用join()函数之前，就已经做完了自己的事情（在构造时传入的方法执行完毕），那么这个函数不会阻塞线程环境，线程环境正常执行。
 
 
+
+### 37.c++ 工厂模式
+
+工厂模式(统称)
+工厂模式是一种创建型模式，适用场景：安全的创建对象。
+
+**顾名思义，工厂是用来生产东西的，而在C++里面就是用来生产对象的。**
+就像一家餐厅一样，你可以按照你的方式来点餐。在工厂模式中也一样，你可以要求工厂为你生产不同的对象。
+闲话不多说，直接上代码！
+
+**简单工厂模式：**
+
+```c++
+#include<iostream>
+#include<string>
+using namespace std;
+class Produce;//声明产品类 
+class Factory;//声明工厂类 
+class Factory
+{
+	public:
+		Factory(){
+		}
+		~Factory(){
+		}
+		virtual Produce* create_produce(string class_name,string name)=0;
+											//工厂生产产品,这里的纯虚函数是为了让子工厂生产产品
+											//返回的是一个产品类指针，这就代表了一个产品
+											//这里的name参数是为了返回想要的产品qwq 
+};
+class Produce
+{
+	public:
+		Produce(){
+		}
+		~Produce(){
+		}
+		virtual void show_myname()=0;//这里定义的纯虚函数是为了让派生类去实现这个函数，有纯虚函数的类是抽象类 
+};
+//现在我要开始创建具体的产品了
+class Produce_apple:public Produce//这是一个具体的苹果类 
+{
+	private:
+		string name;
+	public:
+		Produce_apple(string new_name="")
+		{
+			this->name = new_name;
+		}
+		virtual void show_myname()//重写父类函数 
+		{
+			cout<<"我的名称是："<<name<<endl;
+		}
+};
+class Produce_pear:public Produce//这是一个具体的梨类 
+{
+	private:
+		string name;
+	public:
+		Produce_pear(string new_name="")
+		{
+			this->name = new_name;
+		}
+		virtual void show_myname()//重写父类函数
+		{
+			cout<<"我的名称是："<<name<<endl;
+		}
+};
+class Produce_badfruits:public Produce//这是一个具体的坏水果类 
+{
+	private:
+		string name;
+	public:
+		Produce_badfruits(){
+		}
+		virtual void show_myname()//重写父类函数
+		{
+			cout<<"此产品已经过期！！"<<endl;
+		}
+};
+//下面开始创建具体的工厂类 
+class Factory_fruits:public Factory//这是个水果工厂类
+{
+	public:
+		Factory_fruits(){
+		}
+		~Factory_fruits(){
+		}
+		virtual Produce* create_produce(string class_name,string name)
+		{
+			if (class_name=="apple")
+			{
+				Produce * my_produce = new Produce_apple(name);//创建name的apple产品 
+				return my_produce;
+			}
+			else if (class_name=="pear")
+			{
+				Produce * my_produce = new Produce_pear(name);//创建name的pear产品
+				return my_produce;
+			}
+			else
+			{
+				Produce * my_produce = new Produce_badfruits();//创建name的pear产品
+				return my_produce;
+			}
+		}
+};
+//初期的搭建工作已经完成，总结一下，我们搭建了两个抽象类：工厂类，产品类；
+											    //产品派生类：苹果类，梨类，坏水果类
+												//工厂派生类：水果工厂类。
+												//现在我们要用这些东西了
+int main()
+{
+	Factory * my_factory_fruits = new Factory_fruits();//创建一个抽象工厂对象"升级"为水果工厂
+													//这里的"升级"是我的理解 ,事实上是类型转换 
+	Produce * my_produce_apple = my_factory_fruits->create_produce("apple","红富士");
+	//创建抽象产品对象，"升级"为水果工厂加工出来的apple,红富士 
+	Produce * my_produce_pear = my_factory_fruits->create_produce("pear","冰糖雪梨");
+	//创建抽象产品对象，"升级"为水果工厂加工出来的pear,冰糖雪梨
+	Produce * my_produce_banana = my_factory_fruits->create_produce("banana","大香蕉");
+	//创建抽象产品对象，"升级"为水果工厂加工出来的banana,大香蕉，但是工厂不能生产banana,所以只能生产badfruit坏水果 
+	my_produce_apple->show_myname();
+	//产品显示自己的名称 
+	my_produce_pear->show_myname();
+	//产品显示自己的名称
+	my_produce_banana->show_myname();
+	//产品显示自己的名称
+		
+	//下面是销毁内存
+	delete my_factory_fruits;
+	my_factory_fruits = NULL;
+	delete my_produce_apple;
+	my_produce_apple = NULL;
+	delete my_produce_pear;
+	my_produce_pear = NULL;
+	delete my_produce_banana;
+	my_produce_banana = NULL;
+	return 0; 
+} 
+
+```
+
+这是一个简单工厂模式，在实际的程序开发中，可以将那些具体的产品类编译成DLL，这样可以做到热更新！
+
+**工厂模式：**
+顾名思义工厂模式，并没有那么简单qwq.他不是像简单工厂那样一个水果工厂可以生产各种水果，而是一种工厂生产一种水果。就比如苹果工厂生产苹果，梨子工厂生产梨子。这样分开的好处是什么呢？？？
+我看了很多博客，他们都提到了 开放-封闭原则，我用我自己的话来说，就是如果你想增加新西瓜的产品的话。用简单工厂模式需要增加一个西瓜类，然后在水果工厂里面增加分支。用工厂模式的话需要增加一个西瓜类和一个西瓜类工厂。。。
+但是我们的老师经常教导我们，不要改源码！！！如果用的是简单工厂模式就必须改源码中的条件分支，这会被老师骂死的qwq。所以用工厂模式就不用改源码，只用增加代码即可，妈妈再也不用担心我被骂了。
+上代码！！
+
+```c++
+#include<iostream>
+#include<string>
+using namespace std;
+class Produce;//声明产品类 
+class Factory;//声明工厂类 
+class Factory
+{
+  public:
+  	Factory(){
+  	}
+  	~Factory(){
+  	}
+  	virtual Produce* create_produce(string name)=0;
+  										//工厂生产产品,这里的纯虚函数是为了让子工厂生产产品
+  										//返回的是一个产品类指针，这就代表了一个产品
+  										//这里的name参数是为了返回想要的产品qwq 
+};
+class Produce
+{
+  public:
+  	Produce(){
+  	}
+  	~Produce(){
+  	}
+  	virtual void show_myname()=0;//这里定义的纯虚函数是为了让派生类去实现这个函数，有纯虚函数的类是抽象类 
+};
+//现在我要开始创建具体的产品了
+class Produce_apple:public Produce//这是一个具体的苹果类 
+{
+  private:
+  	string name;
+  public:
+  	Produce_apple(string new_name="")
+  	{
+  		this->name = new_name;
+  	}
+  	virtual void show_myname()//重写父类函数 
+  	{
+  		cout<<"我的名称是："<<name<<endl;
+  	}
+};
+class Produce_pear:public Produce//这是一个具体的梨类 
+{
+  private:
+  	string name;
+  public:
+  	Produce_pear(string new_name="")
+  	{
+  		this->name = new_name;
+  	}
+  	virtual void show_myname()//重写父类函数
+  	{
+  		cout<<"我的名称是："<<name<<endl;
+  	}
+};
+class Produce_banana:public Produce//这是一个具体的坏水果类 
+{
+  private:
+  	string name;
+  public:
+  	Produce_banana(string new_name="")
+  	{
+  		this->name = new_name;
+  	}
+  	virtual void show_myname()//重写父类函数
+  	{
+  		cout<<"我的名称是："<<name<<endl;
+  	}
+};
+//下面开始创建具体的工厂类 
+class Factory_apple:public Factory//这是个水果工厂类
+{
+  public:
+  	Factory_apple(){
+  	}
+  	~Factory_apple(){
+  	}
+  	virtual Produce* create_produce(string name)
+  	{
+  		Produce * my_produce = new Produce_apple(name);//创建name的apple产品 
+  		return my_produce;
+  	}
+};
+class Factory_pear:public Factory//这是个水果工厂类
+{
+  public:
+  	Factory_pear(){
+  	}
+  	~Factory_pear(){
+  	}
+  	virtual Produce* create_produce(string name)
+  	{
+  		
+  		Produce * my_produce = new Produce_pear(name);//创建name的pear产品 
+  		return my_produce;
+  	}
+};
+class Factory_banana:public Factory//这是个水果工厂类
+{
+  public:
+  	Factory_banana(){
+  	}
+  	~Factory_banana(){
+  	}
+  	virtual Produce* create_produce(string name)
+  	{
+  		
+  		Produce * my_produce = new Produce_banana(name);//创建name的badfruits产品 
+  		return my_produce;
+  	}
+};
+//初期的搭建工作已经完成，总结一下，我们搭建了两个抽象类：工厂类，产品类；
+  										    //产品派生类：苹果类，梨类，坏水果类
+  											//工厂派生类：苹果工厂类。梨类工厂类。坏水果工厂类 
+  											//现在我们要用这些东西了
+int main()
+{
+  Factory * my_factory_apple = new Factory_apple();//创建一个抽象工厂对象"升级"为苹果工厂
+  												//这里的"升级"是我的理解 ,事实上是类型转换
+  Factory * my_factory_pear = new Factory_pear();//创建一个抽象工厂对象"升级"为梨子工厂
+  												
+  Factory * my_factory_banana = new Factory_banana();//创建一个抽象工厂对象"升级"为香蕉工厂
+  												
+  Produce * my_produce_apple = my_factory_apple->create_produce("红富士");
+  //创建抽象产品对象，"升级"为苹果工厂加工出来的apple,红富士 
+  Produce * my_produce_pear = my_factory_pear->create_produce("冰糖雪梨");
+  //创建抽象产品对象，"升级"为梨子工厂加工出来的pear,冰糖雪梨
+  Produce * my_produce_banana = my_factory_banana->create_produce("大香蕉");
+  //创建抽象产品对象，"升级"为香蕉工厂加工出来的banana 
+  my_produce_apple->show_myname();
+  //产品显示自己的名称 
+  my_produce_pear->show_myname();
+  //产品显示自己的名称
+  my_produce_banana->show_myname();
+  //产品显示自己的名称
+  	
+  //下面是销毁内存
+  delete my_factory_apple;
+  my_factory_apple = NULL;
+  delete my_factory_pear;
+  my_factory_pear = NULL;
+  delete my_factory_banana;
+  my_factory_banana = NULL;
+  delete my_produce_apple;
+  my_produce_apple = NULL;
+  delete my_produce_pear;
+  my_produce_pear = NULL;
+  delete my_produce_banana;
+  my_produce_banana = NULL;
+  return 0; 
+} 
+```
+
+**抽象工厂模式**
+顾名思义这个模式比普通的工厂模式抽象一点。
+按照我个人的理解，简单工厂模式，工厂模式，抽象模式主要的差别就在与工厂的分类不同。
+简单工厂模式：一个产品一个工厂，十个产品一个工厂。总结：工厂可以生产所有产品
+工厂模式：一个产品一个工厂，十个产品十个工厂。总结：工厂只能生产一个产品
+抽象工厂模式：N个产品M个工厂。总结：工厂可以灵活的生产商品。
+
+还是按刚才的例子，我现在要卖苹果，苹果汁，梨子，梨子汁。
+简单工厂模式就是1个工厂卖四个产品。
+工厂模式就是创建四个工厂卖四个产品。
+抽象工厂模式就不一样：我可以创建两个工厂。一个专门卖苹果类的，一个专门卖梨子类的，除了这样的分类，还可以进行其他的分类，十分的灵活！
+
+闲话不多说，上代码！！
+
+```c++
+#include<iostream>
+#include<string>
+using namespace std;
+class Produce_fruits;//声明水果产品类
+class Produce_fruits_juice;//声明水果汁产品类  
+class Factory;//声明工厂类 
+class Factory
+{
+	public:
+		Factory(){
+		}
+		~Factory(){
+		}
+		virtual Produce_fruits* create_produce(string name)=0;
+											//工厂生产产品,这里的纯虚函数是为了让子工厂生产产品
+											//返回的是一个产品类指针，这就代表了一个产品
+											//这里的name参数是为了返回想要的产品qwq
+		virtual Produce_fruits_juice* create_produce_juice(string name)=0;
+											//工厂生产产品,这里的纯虚函数是为了让子工厂生产产品
+											//返回的是一个产品类指针，这就代表了一个产品
+											//这里的name参数是为了返回想要的产品qwq 
+};
+class Produce_fruits
+{
+	public:
+		Produce_fruits(){
+		}
+		~Produce_fruits(){
+		}
+		virtual void show_myname()=0;//这里定义的纯虚函数是为了让派生类去实现这个函数，有纯虚函数的类是抽象类 
+};
+class Produce_fruits_juice
+{
+	public:
+		Produce_fruits_juice(){
+		}
+		~Produce_fruits_juice(){
+		}
+		virtual void show_myname()=0;//这里定义的纯虚函数是为了让派生类去实现这个函数，有纯虚函数的类是抽象类 
+};
+//现在我要开始创建具体的产品了
+class Produce_apple:public Produce_fruits//这是一个具体的苹果类 
+{
+	private:
+		string name;
+	public:
+		Produce_apple(string new_name="")
+		{
+			this->name = new_name;
+		}
+		virtual void show_myname()//重写父类函数 
+		{
+			cout<<"我的名称是："<<name<<"（水果）"<<endl;
+		}
+};
+class Produce_pear:public Produce_fruits//这是一个具体的梨类 
+{
+	private:
+		string name;
+	public:
+		Produce_pear(string new_name="")
+		{
+			this->name = new_name;
+		}
+		virtual void show_myname()//重写父类函数
+		{
+			cout<<"我的名称是："<<name<<"（水果）"<<endl;
+		}
+};
+class Produce_apple_juice:public Produce_fruits_juice//这是一个具体的苹果类 
+{
+	private:
+		string name;
+	public:
+		Produce_apple_juice(string new_name="")
+		{
+			this->name = new_name;
+		}
+		virtual void show_myname()//重写父类函数 
+		{
+			cout<<"我的名称是："<<name<<"（果汁）"<<endl;
+		}
+};
+class Produce_pear_juice:public Produce_fruits_juice//这是一个具体的梨类 
+{
+	private:
+		string name;
+	public:
+		Produce_pear_juice(string new_name="")
+		{
+			this->name = new_name;
+		}
+		virtual void show_myname()//重写父类函数
+		{
+			cout<<"我的名称是："<<name<<"（果汁）"<<endl;
+		}
+};
+//下面开始创建具体的工厂类 
+class Factory_apple:public Factory//这是个苹果工厂类
+{
+	public:
+		Factory_apple(){
+		}
+		~Factory_apple(){
+		}
+		virtual Produce_fruits* create_produce(string name)
+		{
+			Produce_fruits * my_produce = new Produce_apple(name);//创建name的苹果产品 
+			return my_produce;
+		}
+		virtual Produce_fruits_juice* create_produce_juice(string name)
+		{
+			Produce_fruits_juice * my_produce = new Produce_apple_juice(name);//创建name的苹果汁产品 
+			return my_produce;
+		}
+};
+class Factory_pear:public Factory//这是个梨工厂类
+{
+	public:
+		Factory_pear(){
+		}
+		~Factory_pear(){
+		}
+		virtual Produce_fruits* create_produce(string name)
+		{
+			Produce_fruits * my_produce = new Produce_pear(name);//创建name的梨子产品 
+			return my_produce;
+		}
+		virtual Produce_fruits_juice* create_produce_juice(string name)
+		{
+			Produce_fruits_juice * my_produce = new Produce_pear_juice(name);//创建name的梨子汁产品 
+			return my_produce;
+		}
+};
+//初期的搭建工作已经完成，总结一下，我们搭建了两个抽象类：工厂类，水果产品类，果汁产品类；
+											    //产品派生类：苹果类，梨类，苹果汁类，梨汁类，
+												//工厂派生类：苹果工厂类，梨子工厂类。
+												//现在我们要用这些东西了
+int main()
+{
+	Factory * my_factory_apple = new Factory_apple();//创建一个抽象工厂对象"升级"为苹果工厂
+													//这里的"升级"是我的理解 ,事实上是类型转换
+	Factory * my_factory_pear = new Factory_pear();//创建一个抽象工厂对象"升级"为梨子工厂
+													//这里的"升级"是我的理解 ,事实上是类型转换 
+	Produce_fruits * my_produce_apple = my_factory_apple->create_produce("红富士");
+	//创建抽象产品对象，"升级"为苹果工厂加工出来的红富士 
+	Produce_fruits * my_produce_pear = my_factory_pear->create_produce("鸭梨");
+	//创建抽象产品对象，"升级"为梨子工厂加工出来的鸭梨
+	Produce_fruits_juice * my_produce_apple_juice = my_factory_apple->create_produce_juice("红苹果汁");
+	//创建抽象产品对象，"升级"为苹果工厂加工出来的红苹果汁
+	Produce_fruits_juice * my_produce_pear_juice = my_factory_pear->create_produce_juice("冰糖雪梨果汁");
+	//创建抽象产品对象，"升级"为梨子工厂加工出来的冰糖雪梨果汁 
+	my_produce_apple->show_myname();
+	//产品显示自己的名称 
+	my_produce_pear->show_myname();
+	//产品显示自己的名称
+	my_produce_apple_juice->show_myname();
+	//产品显示自己的名称
+	my_produce_pear_juice->show_myname();
+	//产品显示自己的名称
+	
+	//下面是销毁内存 
+	delete my_factory_apple;
+	my_factory_apple = NULL;
+	delete my_factory_pear;
+	my_factory_pear = NULL;
+	delete my_produce_apple;
+	my_produce_apple = NULL;
+	delete my_produce_pear;
+	my_produce_pear = NULL;
+	delete my_produce_apple_juice;
+	my_produce_apple_juice = NULL;
+	delete my_produce_pear_juice;
+	my_produce_pear_juice = NULL;
+	return 0; 
+} 
+```
+
+**总结:**
+
+```c++
+##### 特点：
+简单工厂模式：一个工厂N个产品
+工厂模式：N个工厂N个产品
+抽象工厂模式：N个工厂M个产品
+##### 缺点（相对）：
+简单工厂模式：违背了开放封闭原则（改动源码），产品多了会比较杂
+工厂模式：产品多了会很杂，代码量稍大，产品多了会比较杂
+抽象工厂模式：违背了开放封闭原则（改动源码），代码量大，产品多了会比较非常杂
+##### 优点（相对）：
+简单工厂模式：代码量小，方便添加新的产品
+工厂模式：不违背了开放封闭原则（不改动源码），方便添加新的产品
+抽象工厂模式：模式灵活，调用方便
+```
+
+在实际开发中可以混用,人的思维是灵活的，代码才是灵活的，功能才是灵活的，不同的工具灵活使用才能发挥出最大的功能
+
+
+
+
 ## 四. 操作系统
 
 ### 1. I/O模型
@@ -5130,7 +5649,16 @@ Server 层包括：连接器、查询缓存、分析器、优化器、执行器�
 描述
 
 - 适配器模式属于结构型模式
+
 - 原型模式属于创建型模式，实现了一个原型接口，用于创建当前对象的克隆
+
 - 桥接模式属于结构型模式，用于将抽象化与实现化解耦，使得二者可以独立变化
+
 - 策略模式属于行为型模式。意图是定义一系列算法，将其一个个封装起来，并使他们可互相替换
+
+  
+
+
+
+
 
