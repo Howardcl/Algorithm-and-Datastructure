@@ -1491,6 +1491,43 @@ ostream& operator<<(ostream& os, const String& str) {
 -------------------------------------------
 ```
 
+### 6.7 std::make_shared
+
+C++11 中引入了[智能指针](https://so.csdn.net/so/search?q=智能指针&spm=1001.2101.3001.7020), 同时还有一个模板函数 std::make_shared 可以返回一个指定类型的 std::shared_ptr
+
+```c++
+// make_shared example
+#include <iostream>
+#include <memory>
+ 
+int main () {
+ 
+  std::shared_ptr<int> foo = std::make_shared<int> (10);
+  // same as:
+  std::shared_ptr<int> foo2 (new int(10));
+ 
+  auto bar = std::make_shared<int> (20);
+ 
+  auto baz = std::make_shared<std::pair<int,int>> (30,40);
+ 
+  std::cout << "*foo: " << *foo << '\n';
+  std::cout << "*bar: " << *bar << '\n';
+  std::cout << "*baz: " << baz->first << ' ' << baz->second << '\n';
+ 
+  return 0;
+}
+```
+
+输出结果：
+
+```c++
+*foo:10
+*bar:20
+*baz:30 40
+```
+
+
+
 ### 7. lambda 表达式
 
 是匿名函数还是匿名类
