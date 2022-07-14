@@ -4024,6 +4024,14 @@ static_cast < type-id > ( expression )
 
 
 
+### 40.override和final
+
+override：必须重载
+
+final：不希望被继承或重载。
+
+
+
 
 ## 四. 操作系统
 
