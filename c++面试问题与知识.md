@@ -879,10 +879,18 @@ void* operator new[](std::size_t size, const char* file, int line);
 在有继承特性的类成员函数中，有以下几种函数不能为虚函数：
 
 - **构造函数**：从存储空间的角度来看，构造函数调用前，对象都还没有产生，无法找到虚表（虚表中存放着对象拥有的虚函数的地址），也就无法调用虚函数。而且从使用的角度来讲，是无法通过父类的指针去调用子类的构造函数的。
-
 - **内联成员函数**：内联函数在编译时就被展开了，而虚函数在运行时才能动态地绑定函数，不可能统一。我试过，虚函数声明为内联函数不会报错，可以正常地进行动态绑定，为什么呢？因为内联函数最终是否内联是由编译器决定的，遇到虚函数的情况编译器只会将其当作普通函数来处理，所以尽管将其声明为内联函数，但实际上它只是一个普通的虚函数而已。
-
 - **静态成员函数**：所有对象共享一份代码，不归某个对象所有，没有动态绑定的必要。
+
+#### 2.3 纯虚函数
+
+语法:virtual 返回值类型 函数名(参数列表)=0,
+
+```c++
+virtual bool Initialize() = 0;
+```
+
+
 
 ### 3. 宏 模板 内联
 
@@ -4026,9 +4034,82 @@ static_cast < type-id > ( expression )
 
 ### 40.override和final
 
-override：必须重载
+override：必须重载。在函数后面加上override代表此函数重载了父类的同名虚函数。
 
 final：不希望被继承或重载。
+
+### 41.mutable
+
+mutalbe的中文意思是“可变的，易变的”，跟constant（既C++中的const）是反义词。
+
+在C++中，mutable也是为了突破const的限制而设置的。被mutable修饰的变量，将永远处于可变的状态，即使在一个const函数中。
+
+我们知道，如果类的成员函数不会改变对象的状态，那么这个成员函数一般会声明成const的。但是，有些时候，我们需要在const的函数里面修改一些跟类状态无关的数据成员，那么这个数据成员就应该被mutalbe来修饰。
+
+以下代码如果要在matest中进行修改m_a的值，就得在定义const A a，去掉const，并且在A类方法的声明时去掉const，但是mutable可以突破这层限制。
+```c++
+#include <iostream>
+
+using namespace std;
+
+class A
+{
+public:
+	A(int a):m_a(a){}
+	void matest()const;
+	void macout()const
+	{
+		cout << m_a << endl;
+	}
+private:
+	int m_a;
+};
+
+void A::matest() const
+{
+	//m_a = 10;//被const修饰的函数不允许修好任何类状态值(类里面的数据)
+	cout << m_a << endl;
+}
+
+int main()
+{
+	const A a(1);
+	a.macout();//用const修饰的一个类使用一个const修饰的方法
+	return 0;
+}
+```
+
+```c++
+#include <iostream>
+
+using namespace std;
+
+class A
+{
+public:
+	A(int a):m_a(a){}
+	void matest()const;
+	void macout()const
+	{
+		cout << m_a << endl;
+	}
+private:
+	mutable int m_a;
+};
+
+void A::matest() const
+{
+	m_a = 10;//在定义时用mutable来突破这层限制
+	cout << m_a << endl;
+}
+
+int main()
+{
+	const A a(1);
+	a.macout();//用const修饰的一个类使用一个const修饰的方法
+	return 0;
+}
+```
 
 
 
