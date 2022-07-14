@@ -3846,6 +3846,162 @@ int main()
 
 在实际开发中可以混用,人的思维是灵活的，代码才是灵活的，功能才是灵活的，不同的工具灵活使用才能发挥出最大的功能
 
+### 38.拷贝构造
+
+拷贝构造：：一种特殊的构造函数，用基于同一类的一个对象构造和初始化另一个对象。
+当没有拷贝构造函数时，通过默认拷贝构造函数来创建一个对象。
+
+```c++
+A a;
+A b(a);
+A b= a;
+```
+
+都是拷贝构造函数来创建对象b。
+
+***\**\*\*\*\*\*\*\*\*\*\*\*\*\*ATTENTION\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\**\****
+**b 对象之前是不存在的，用a对象来构造和初始化b的！！！**
+
+何时调用拷贝构造函数：
+
+1.对象以值传递的方式传入函数内;
+
+2.对象以值传递的方式从函数返回;
+
+3.对象需要通过另一个对象初始化.
+
+**引入一个问题**
+
+```c++
+#include <iostream>
+using namespace std;
+class Test {
+    int i;
+public:
+    Test(int x) {
+        i = x;
+    }
+    Test(const Test& a) {
+        this->i = a.i;
+        cout << "Copy" << endl;
+    }
+};
+Test work() {
+    Test tot(0);
+    return tot;
+}
+/*Test work() {  
+    Test* tot = new Test(1);//这里调用的就是传地址的构造函数
+    return *tot;
+}*/
+int main() {
+    work();
+    return 0;
+}
+```
+
+
+
+***\**\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*ATTENTION\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\**\****
+**系统默认提供的拷贝构造函数的工作方式是[内存](https://so.csdn.net/so/search?q=内存&spm=1001.2101.3001.7020)拷贝—浅拷贝。
+如果对象中用到了需要手动释放的对象，就会出现问题，这时就需要手动重载拷贝构造函数—–实现深拷贝**
+
+浅拷贝： 如果复制的对象中引用以一个外部内容（例如分配在堆上的数据），那么在复制这个对象的时候，让新旧对象指向同一个外部内容，就是浅拷贝。（指针虽然复制了，但所指向的空间内容并没有复制，而是由两个对象共用，两个对象不独立，删除弓箭存在问题）
+
+深拷贝：如果在复制这个对象的时候为新对象制作了外部对象的独立复制，就是深拷贝。
+
+拷贝构造函数重载声明 A(const A& other)
+
+**3.赋值函数**
+
+赋值函数：： 一个类的对象向该类的另一个对象赋值。
+
+当没有重载赋值函数（[赋值运算符](https://so.csdn.net/so/search?q=赋值运算符&spm=1001.2101.3001.7020)）时，通过默认赋值函数来进行赋值操作。
+```c++
+A a;
+A b;
+b =a ;
+```
+
+***\**\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*ATTENTION\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\**\***
+**a, b 对象是已经存在的，用a对象来赋值给b!!!!!!**
+
+赋值运算符的重载声明：
+A& operator = (const A& other)
+
+**拷贝构造函数和赋值函数的区别**
+
+1.拷贝构造函数是一个对象初始化一块内存区域，这块内存就是新对象的内存去，而赋值函数是对于一个已经被初始化的对象进行赋值操作。
+
+2.在数据成员包含指针对象的时候，一种是复制指针对象，另一种是引用指针对象。拷贝构造函数大多数是复制，赋值函数是引用对象。
+
+3.实现不一样。拷贝–是构造函数，通过参数对象，初始化产生一个对象。赋值函数则把一个新的对象赋值给一个原有的对象——所有如果原有的对象中有内存分配要先把内存释放掉，而且还要检查一下两个对象是不是同一个对象，如果是，不做任何操作，直接返回
+
+
+
+
+string 类的完成的3个函数实现
+
+```c++
+#include <string>
+class string
+{
+    string(const char* str);
+    string(const string& ohter);
+    string& operator=(const string& other);
+    ~string();
+private:
+    char* m_data;
+};
+// 构造函数
+string::string(const char* str)
+{
+    if(str == NULL)
+    {
+        m_data = new char[1];
+        m_data = '\n';
+    }
+    else
+    {
+        int strlen = strlen(str);
+        m_data = new char[strlen + 1];
+        strcpy(m_data, str);
+    }
+}
+// 拷贝构造函数
+string::string(const string& other)
+{
+    int strlen = strlen(other.m_data);
+    m_data = new char[strlen +1];
+    strcpy(m_data , other.m_data);
+}
+//赋值函数
+string & string::operator=(const string& other)
+{
+    if(this == &other) //自我检查
+    {
+        return *this;
+    }
+    //删除原有数据内存
+    delete []m_data;
+    int strlen = strlen(other.m_data);
+    m_data = new char[strlen +1];
+    strcpy(m_data ,other.m_data);
+    return 8this;
+}
+// 析构函数
+string::~string()
+{
+    delete []m_data;
+}
+```
+
+**总结:: **
+
+**对象不存在，且没用别的对象来初始化，调用构造函数**
+**对象不存在，且用别的对象来初始化，调用拷贝构造**
+**对象存在，用别的对象给他赋值，就是赋值函数**
+
 
 
 
