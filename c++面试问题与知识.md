@@ -3332,7 +3332,7 @@ duration:228ms
 
 ### 36.join()
 
-用于多线程环境中，保证程序后续处理能正常执行，join()会阻塞线程环境，知道线程对象执行完传入的方法，总结理解一下就是两个关键点：
+用于多线程环境中，保证程序后续处理能正常执行，join()会阻塞线程环境，直到线程对象执行完传入的方法，总结理解一下就是两个关键点：
 
 - **谁调用了这个函数？**调用了这个函数的线程对象，一定要等这个线程对象的方法（在构造时传入的方法）执行完毕后（或者理解为这个线程的活干完了！），这个join()函数才能得到返回。
 - **在什么线程环境下调用了这个函数？**上面说了必须要等线程方法执行完毕后才能返回，那必然是阻塞调用线程的，也就是说如果一个线程对象在一个线程环境调用了这个函数，那么这个线程环境就会被阻塞，直到这个线程对象在构造时传入的**方法**执行完毕后，才能继续往下走，另外如果线程对象在调用join()函数之前，就已经做完了自己的事情（在构造时传入的方法执行完毕），那么这个函数不会阻塞线程环境，线程环境正常执行。
@@ -4112,6 +4112,105 @@ int main()
 ```
 
 
+
+### 42.function
+
+```c++
+#include <iostream>  
+#include <vector>  
+#include <list>  
+#include <map>  
+#include <set>  
+#include <string>  
+#include <algorithm>  
+#include <functional>  
+#include <memory>  
+using namespace std;  
+  
+//声明一个模板  
+typedef std::function<int(int)> Functional;  
+  
+  
+//normal function  
+int TestFunc(int a)  
+{  
+    return a;  
+}  
+  
+//lambda expression  
+auto lambda = [](int a)->int{return a;};  
+  
+//functor仿函数  
+class Functor  
+{  
+public:  
+    int operator() (int a)  
+    {  
+        return a;  
+    }  
+};  
+  
+  
+//类的成员函数和类的静态成员函数  
+class CTest  
+{  
+public:  
+    int Func(int a)  
+    {  
+        return a;  
+    }  
+    static int SFunc(int a)  
+    {  
+        return a;  
+    }  
+};  
+  
+  
+int main(int argc, char* argv[])  
+{  
+    //封装普通函数  
+    Functional obj = TestFunc;  
+    int res = obj(0);  
+    cout << "normal function : " << res << endl;  
+  
+    //封装lambda表达式  
+    obj = lambda;  
+    res = obj(1);  
+    cout << "lambda expression : " << res << endl;  
+  
+    //封装仿函数  
+    Functor functorObj;  
+    obj = functorObj;  
+    res = obj(2);  
+    cout << "functor : " << res << endl;  
+  
+    //封装类的成员函数和static成员函数  
+    CTest t;  
+    obj = std::bind(&CTest::Func, &t, std::placeholders::_1);  
+    res = obj(3);  
+    cout << "member function : " << res << endl;  
+  
+    obj = CTest::SFunc;  
+    res = obj(4);  
+    cout << "static member function : " << res << endl;  
+  
+    return 0;  
+}  
+```
+
+输出结果如下：
+
+```c++
+normal function : 0
+lambda expression : 1
+functor : 2
+member function : 3
+static member function : 4
+```
+
+### 43.unordered_map取代switch_case
+
+​	switch-case 作为原生的机制，效率还是非常高的，在百个 case 这个量级下比 stl 的容器效率高很多（目前大多项目一个 case 百量级应该够用了），但 switch-case 在 case 较多的情况下，即使每个 case 只用一个函数可读性感觉还是没那么好，所以在效率没那么敏感，case 较多的情况下还是用一些结构如 map 等去整理 case 比较好。
 
 
 ## 四. 操作系统
