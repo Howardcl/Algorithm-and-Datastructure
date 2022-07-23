@@ -4268,6 +4268,31 @@ The contents of the vector are "Hello", "Hello"
 
 ```
 
+### 45.vector reserve()
+
+reserve成员函数允许你最小化必须进行的重新分配的次数，因而可以避免真分配的开销和迭代器/指针/引用失效。
+
+reserve(Container::size_type n)强制容器把它的容量改为至少n，提供的n不小于当前大小。这一般强迫进行一次重新分配，因为容量需要增加。
+
+例如，假定你想建立一个容纳1-1000值的vector<int>。没有使用reserve，你可以像这样来做：
+
+```c++
+vector<int> v;
+for (int i = 1; i <= 1000; ++i) v.push_back(i);
+```
+
+在大多数STL实现中，这段代码在循环过程中将会导致2到10次重新分配。（10这个数没什么奇怪的。记住vector在重新分配发生时一般把容量翻倍，而1000约等于210。）
+
+把代码改为使用reserve，我们得到这个：
+
+```c++
+vector<int> v;
+v.reserve(1000);
+for (int i = 1; i <= 1000; ++i) v.push_back(i);
+```
+
+这在循环中不会发生重新分配。
+
 
 ## 四. 操作系统
 
