@@ -858,15 +858,15 @@ void* operator new[](std::size_t size, const char* file, int line);
 
 #### 2.1 构造析构能否为虚？
 
-构造函数不能是虚函数，析构函数可以是虚函数（父类的析构函数需定义为虚函数）。
+构造函数不能是虚函数，**析构函数可以是虚函数**（父类的析构函数需定义为虚函数）。
 
-（1）从存储空间角度上来看：如果构造函数是虚函数，就需要通过虚表来调用。而**虚表是存储在对象的内存空间**的，调用构造函数前对象还没有实例化出来，也就是内存空间还没有，无法找到虚表。所以，在构造出对象前是不能调用虚函数的。
+（1）从存储空间角度上来看：如果构造函数是虚函数，就需要通过虚表来调用。而**虚表是存储在对象的内存空间**的，==调用构造函数前对象还没有实例化出来，也就是内存空间还没有，无法找到虚表。所以，在构造出对象前是不能调用虚函数的。==
 
-​		 从使用角度上来看：虚函数的作用在于通过父类的指针动态地调用子类的成员函数，而构造函数是在创建对象时自动调用的，不可能通过父类的指针去调用，因此也就规定了构造函数不能是虚函数。
+​		 从使用角度上来看：**虚函数的作用在于通过父类的指针动态地调用子类的成员函数**，而构造函数是在创建对象时自动调用的，不可能通过父类的指针去调用，因此也就规定了构造函数不能是虚函数。
 
 （2）析构函数可以是虚函数，且常常如此。
 
-因为此时虚表已经初始化了，我们通常通过基类的指针来销毁对象，如果析构函数不是虚函数，就不能实现运行时期的动态绑定，只会在编译期间静态绑定，仅会调用父类的析构函数，不会调用子类的析构函数。当子类的析构函数中有释放堆区空间的操作时，如果父类的析构函数不是虚函数，就会导致内存泄漏。
+因为此时虚表已经初始化了，**我们通常通过基类的指针来销毁对象，如果析构函数不是虚函数，就不能实现运行时期的动态绑定**，只会在编译期间静态绑定，仅会调用父类的析构函数，不会调用子类的析构函数。当子类的析构函数中有释放堆区空间的操作时，如果父类的析构函数不是虚函数，就会导致内存泄漏。
 
 #### 2.2 不能为虚函数的函数
 
@@ -879,10 +879,18 @@ void* operator new[](std::size_t size, const char* file, int line);
 在有继承特性的类成员函数中，有以下几种函数不能为虚函数：
 
 - **构造函数**：从存储空间的角度来看，构造函数调用前，对象都还没有产生，无法找到虚表（虚表中存放着对象拥有的虚函数的地址），也就无法调用虚函数。而且从使用的角度来讲，是无法通过父类的指针去调用子类的构造函数的。
-
 - **内联成员函数**：内联函数在编译时就被展开了，而虚函数在运行时才能动态地绑定函数，不可能统一。我试过，虚函数声明为内联函数不会报错，可以正常地进行动态绑定，为什么呢？因为内联函数最终是否内联是由编译器决定的，遇到虚函数的情况编译器只会将其当作普通函数来处理，所以尽管将其声明为内联函数，但实际上它只是一个普通的虚函数而已。
-
 - **静态成员函数**：所有对象共享一份代码，不归某个对象所有，没有动态绑定的必要。
+
+#### 2.3 纯虚函数
+
+语法:virtual 返回值类型 函数名(参数列表)=0,
+
+```c++
+virtual bool Initialize() = 0;
+```
+
+
 
 ### 3. 宏 模板 内联
 
@@ -905,7 +913,7 @@ void* operator new[](std::size_t size, const char* file, int line);
 
   ![image-20210830174257162](https://i.loli.net/2021/08/30/uzfZIGyCQnDcHE8.png)
 
-  我试了以下，虚函数是内联函数时仍然能正确地动态绑定，为什么呢？
+  我试了一下，虚函数是内联函数时仍然能正确地动态绑定，为什么呢？
 
   原因是：**即使虚函数被声明为了内联函数，编译器遇到这种情况根本不会将这样的函数内联展开，而是当作普通函数来处理。**
 
@@ -975,6 +983,14 @@ b = a + 2;      // × b 是左值，不能出现在在赋值符号左边，不�
 ```
 
 **左值引用和右值引用**
+
+C++11的标准库 <utility> 提供了一个非常有用的函数 std::move()，std::move() 函数将一个左值强制转化为右值引用，以用于移动语义。
+
+移动语义，允许直接转移对象的资产和属性的所有权，而在参数为右值时无需复制它们。
+
+换一种说法就是，std::move() 将对象的状态或者所有权从一个对象转移到另一个对象，只是转移，没有内存的搬迁或者内存拷贝。
+
+因此，通过std::move()，可以避免不必要的拷贝操作。
 
 
 
@@ -1230,7 +1246,7 @@ ostream& operator<<(ostream& os, const String& str) {
 
 - **为何摒弃`auto_ptr`？**
 
-  （1）优点：所有权互斥，可以保证同一时刻只允许一个指针指向给定的对象，避免同一对象被多次删除）
+  （1）优点：所有权互斥，可以保证同一时刻只允许一个指针指向给定的对象，避免同一对象被多次删除
 
   （2）缺点：`auto_ptr` 进行赋值操作时，去赋值的一方将其所有权转让给被赋值的一方，去赋值的一方就丧失使用权了，空指针是无法使用的。摒弃它是为了**避免潜在的内存崩溃问题**。无移动语义。
 
@@ -1483,17 +1499,260 @@ ostream& operator<<(ostream& os, const String& str) {
 -------------------------------------------
 ```
 
+### 6.7 std::make_shared
+
+C++11 中引入了[智能指针](https://so.csdn.net/so/search?q=智能指针&spm=1001.2101.3001.7020), 同时还有一个模板函数 std::make_shared 可以返回一个指定类型的 std::shared_ptr
+
+```c++
+// make_shared example
+#include <iostream>
+#include <memory>
+ 
+int main () {
+ 
+  std::shared_ptr<int> foo = std::make_shared<int> (10);
+  // same as:
+  std::shared_ptr<int> foo2 (new int(10));
+ 
+  auto bar = std::make_shared<int> (20);
+ 
+  auto baz = std::make_shared<std::pair<int,int>> (30,40);
+ 
+  std::cout << "*foo: " << *foo << '\n';
+  std::cout << "*bar: " << *bar << '\n';
+  std::cout << "*baz: " << baz->first << ' ' << baz->second << '\n';
+ 
+  return 0;
+}
+```
+
+输出结果：
+
+```c++
+*foo:10
+*bar:20
+*baz:30 40
+```
+
+
+
 ### 7. lambda 表达式
 
 是匿名函数还是匿名类
 
 如果引用捕获的值被释放掉怎么处理
 
+
+
+C++ 11 中的 Lambda 表达式用于定义并创建匿名的函数对象，以简化编程工作(便于就地定义函数，提升代码可读性)。
+
+1. Lambda 的语法形式
+如下：
+
+```c++
+[参数捕获列表] (函数参数列表) mutable 或 exception 声明 -> 返回值类型 { Lambda函数体 }
+```
+
+
+可以看到，Lambda 主要分为五个部分：
+
+`[参数捕获列表]`
+`(函数参数列表)`
+`mutable 或 exception 声明`
+`-> 返回值类型`
+`{ Lambda函数体 }`
+
+示例：
+
+```c++
+[] (int x) -> int { return x * x; } // 不捕获任何外部变量，仅使用局部变量；返回int类型；
+[] (int x, int y) { return x + y; } // 隐式返回类型；
+[] (int& x) { ++x; } // 没有 return 语句 -> Lambda 函数的返回类型是 ‘void’；
+[] () { ++global_x; } // 没有参数，仅访问某个全局变量；
+[] { ++global_x; } // 与上一个相同，省略了 (函数参数列表)；
+[] (int x, int y) -> int { int z = x + y; return z; } // 显示指定返回类型；
+[id] () { use_id(); } // 以值方式使用外部变量id；
+[&id] () { read_or_write_id(); } // 以引用方式使用外部变量id；
+[this] () { this->xxx(this->yyy); } // 使用所在类的成员;
+```
+
+
+
 ### 8. `explict`
 
-- #### 为何尽量使用 `explict` 关键字？
+转换函数，其实我们一直都在使用，只是没有注意到而已。比如，我们将一个int变量和double变量相加时，编译器会将int转换成double,然后再让两个double相加。那么我们是否可以将一个类对象转换成其他对象呢？答案是可以的，而且这里的其他对象既可以是int这样的内置类型，也可以是我们定义的另一个类。
 
-  使用`explicit`可以禁止编译器自动调用拷贝初始化，还可以禁止编译器对构造函数的参数进行隐式转换。在`c++`中`explicit`关键字只能用来修饰**构造函数**。
+```c++
+#include<iostream>
+using namespace std;
+class Fraction
+{
+	public:
+	    Fraction(int num,int den = 1):m_numerator(num),m_denominator(den) { }	
+		int get_m_n() const {return 	m_numerator;}
+	    int get_m_d() const {return 	m_denominator;}
+		Fraction& operator+(const Fraction& f){
+			int m_n;
+			int m_d;
+			m_n = m_numerator*f.m_denominator + m_denominator*f.m_numerator;
+			m_d = m_denominator*f.m_denominator;
+			m_numerator = m_n;
+			m_denominator = m_d; 
+			return *this;
+		} 
+	private:
+		int m_numerator;
+		int m_denominator;
+} ;
+ 
+ostream& operator<< (ostream& os,const Fraction& f){
+	os << f.get_m_n() << '/' << f.get_m_d();
+	return os;
+}
+ 
+int main(){
+	Fraction i(2,5); 
+	Fraction f = i + 4;
+	cout << f << endl;
+	return 0;
+} 
+```
+
+结果：
+
+```c++
+22/5
+```
+
+分析：可见在   Fraction f = i + 4;这句中[编译器](https://so.csdn.net/so/search?q=编译器&spm=1001.2101.3001.7020)就将4转换了一个Fraction类。
+
+那要怎么样才能避免编译器做出这样的转换了，那就是用explicit关键字来修饰构造函数。
+
+```c++
+explicit Fraction(int num,int den = 1)
+		  :m_numerator(num),m_denominator(den) { }	
+```
+
+第二个问题来了，我们怎么将Fraction这个类转换成int这样的变量呢，这样的转换函数就要我们自己来写啦。
+
+```c++
+#include<iostream>
+using namespace std;
+class Fraction
+{
+	public:
+	    explicit Fraction(double num,double den = 1)
+		  :m_numerator(num),m_denominator(den) { }	
+		double get_m_n() const {return 	m_numerator;}
+	    double get_m_d() const {return 	m_denominator;}
+		Fraction& operator+(const Fraction& f){
+			double m_n;
+			double m_d;
+			m_n = m_numerator*f.m_denominator + m_denominator*f.m_numerator;
+			m_d = m_denominator*f.m_denominator;
+			m_numerator = m_n;
+			m_denominator = m_d; 
+			return *this;
+		} 
+		operator double() const {
+			return (double) (m_numerator/m_denominator);
+		}
+	private:
+		double m_numerator;
+		double m_denominator;
+} ;
+ 
+ostream& operator<< (ostream& os,const Fraction& f){
+	os << f.get_m_n() << '/' << f.get_m_d();
+	return os;
+}
+ 
+int main(){
+	Fraction i(2,5); 
+	cout << i << endl;
+	double n = i + 4;
+	cout << n << endl;
+	return 0;
+} 
+```
+
+转换函数还可以完成两个类之间的转化：
+
+```c++
+#include<iostream>
+using namespace std;
+ 
+class complex {
+	private :
+		double re;
+		double im;
+	public :
+		complex(double r,double i){
+			re = r;
+			im = i;
+		}
+		double get_re() const {return re;}
+		double get_im() const {return im;}
+};
+ 
+ 
+class Fraction
+{
+	public:
+	    explicit Fraction(double num,double den = 1)
+		  :m_numerator(num),m_denominator(den) { }	
+		double get_m_n() const {return 	m_numerator;}
+	    double get_m_d() const {return 	m_denominator;}
+		Fraction& operator+(const Fraction& f){
+			double m_n;
+			double m_d;
+			m_n = m_numerator*f.m_denominator + m_denominator*f.m_numerator;
+			m_d = m_denominator*f.m_denominator;
+			m_numerator = m_n;
+			m_denominator = m_d; 
+			return *this;
+		} 
+		operator complex() const {
+			return complex(m_numerator,m_denominator);
+		}
+	private:
+		double m_numerator;
+		double m_denominator;
+} ;
+ 
+ostream& operator<< (ostream& os,const Fraction& f){
+	os << f.get_m_n() << '/' << f.get_m_d();
+	return os;
+}
+ 
+ 
+ostream& operator<< (ostream& os,const complex& c){
+	os << c.get_re() << '+' << c.get_im() << "i";
+	return os;
+}
+ 
+ 
+int main(){
+	Fraction i(2,5); 
+	cout << i << endl;
+	complex n = i ;
+	cout << n << endl;
+	return 0;
+} 
+```
+
+输出结果：
+
+```c++
+2/5
+2+5i
+```
+
+
+
+为何尽量使用 `explict` 关键字？
+
+- 使用`explicit`可以**禁止编译器自动调用拷贝初始化，还可以禁止编译器对构造函数的参数进行隐式转换**。**在`c++`中`explicit`关键字只能用来修饰构造函数。**
 
 - #### 什么是拷贝初始化？
 
@@ -1947,9 +2206,64 @@ int main()
 
 ### 17. static
 
-（1）static 修饰类成员数据：表示该数据属于整个类，实例化对象之前就可以访问。禁止在类内初始化（如果在类内初始化，会导致每个对象都包含该静态成员，所以不允许），类外初始化时不必再加 static 关键字（类外函数加 static 表示限定函数的作用域仅限本文件）
+（1）static 修饰类成员数据：表示该数据属于整个类，实例化对象之前就可以访问。禁止在类内初始化（如果在类内初始化，会导致每个对象都包含该静态成员，所以不允许），**类外初始化时不必再加 static 关键字**（类外函数加 static 表示限定函数的作用域仅限本文件）
 
-（2）修饰类成员函数： 该函数在实例化对象前就能访问，函数内不能访问非静态的成员数据和调用非静态的成员函数
+**static修饰的变量先于对象存在，所以static修饰的变量要在类外初始化。因为static是所有对象共享的变量，必须要比对象先存在。**
+
+例如:
+
+```c++
+ class Text  
+ {  
+      public:  
+      static int count;  
+  };  
+    
+  int Text::count=0;//用static成员变量必须要初始化   
+    
+  int main()  
+ {  
+     Text t1;  
+     Text t2;  
+       
+     t1.count = 100;     //t1对象把static成员count改为100   
+     cout<<t2.count<<endl; //当t2对象打印static成员的时候，显示的是100而不是0   
+     return 0;  
+ }  
+```
+
+好处：
+
+用static修饰的成员变量在对象中是不占内存的，因为他不是跟对象一起在堆或者栈中生成，用static修饰的变量在静态存储区生成的。所以用static修饰一方面的好处：**是可以节省对象的内存空间。**如同你创建100个Person对象，而这100个对象都有共有的一个变量，例如叫国籍变量，就是Person对象的国籍都是相同的。那如果国籍变量用static修饰的话，即使有100个Person对象，也不会创建100个国籍变量，只需要有一个static修饰的国籍变量就可以了。这100个对象要用的时候，就会去调用static修饰的国籍变量。否则有100个Person变量，就会创建100个国籍变量，在国籍变量都是相同的情况下，就等于浪费空间了。
+
+
+（2）修饰类成员函数： 该函数在实例化对象前就能访问，static函数内不能访问非静态的成员数据和调用非静态的成员函数
+
+由于static修饰的[类成员](https://so.csdn.net/so/search?q=类成员&spm=1001.2101.3001.7020)属于类，不属于对象，因此static类成员函数是没有this指针的，this指针是指向本对象的指针。正因为没有this指针，所以static类成员函数不能访问非static的类成员，只能访问 static修饰的类成员。
+
+```cpp
+class Text  
+  {  
+      public:  
+      static int fun()  
+      {  
+          return num;  
+      }  
+      static int count;  
+      int num;  
+ };  
+ int Text::count=5;//用static成员变量必须要初始化   
+   
+ int main()  
+ {  
+     Text t1;  
+     Text t2;  
+     t1.num=100;  
+       
+     t1.fun();//发生错误，fun函数return的是非static类成员 如果return count就正确   
+     return 0;  
+ }  
+```
 
 （3）修饰局部变量：延长局部变量的声明周期，直到程序运行结束以后才释放、
 
@@ -1957,9 +2271,187 @@ int main()
 
 （5）修饰函数：限定该函数只能在本文件中调用，不能被其他文件调用
 
+**static在单例模式中也有应用。**
+
+所谓单例就是一个类只能被实例化一次，主要有两种实现方法：
+
+1. 在类使用之前，就将类实例化，也叫饿汉模式。利用静态对象
+
+2. 使用到类时，才进行实例化，也叫懒汉模式。利用静态对象指针
+
+   **第一种饿汉模式：**
+
+```c++
+#include <iostream>
+using namespace std;
+
+class Singleton
+{
+  private:
+    Singleton(){
+        cout << "构造" << endl;
+        num = 10;
+    }
+    ~Singleton(){
+        cout << "析构" << endl;
+    }
+    int num;
+    static Singleton locla_s;//静态类成员
+  public:
+    static Singleton *getInstance()
+    {
+        return &locla_s;
+    }
+    void Print()
+    {
+    	std::cout << num << std::endl;
+    }	
+};
+
+Singleton Singleton::locla_s;//值得注意的地方 需要在类外对静态类成员初始化
+
+int main()
+{
+    Singleton* P_Singleton = Singleton::getInstance();
+    P_Singleton->Print();
+	return 0;
+}
+```
+
+结果：
+
+```c++
+构造
+析构
+```
+
+
+改变主函数：
+
+```c++
+int main()
+{
+    Singleton * s2 = Singleton::getInstance();
+    cout << s2 << endl;
+    Singleton * s3 = Singleton::getInstance();
+    cout << s3 << endl;
+    return 0;
+}
+```
+
+结果：
+
+```c++
+构造
+0x601191
+0x601191
+析构
+```
+
+结论：
+
+可见这种方式，即便主函数中没有对这个类有任何操作，也会在进入主函数之前启动构造函数，在退出主函数之前启动析构造函数。在主函数中多次创建指针相同，表明是同一个实例化对象。
+
+**懒汉模式：**
+
+```c++
+#include <iostream>
+using namespace std;
+
+class Singleton
+{
+  private:
+    static Singleton *local_instance;
+    Singleton(){cout  << "构造" << endl;}
+    ~Singleton(){cout  << "析构" << endl;}
+
+  public:
+    static Singleton *getInstance()
+    {
+        if (local_instance == nullptr)
+        {
+            local_instance = new Singleton();
+            cout << "new 新空间" << endl;
+        }
+        else
+        {
+            cout << "空间不变" << endl;
+        }
+        
+
+        return local_instance;
+    }
+    static void delete_local()
+    {
+        delete local_instance;
+    }
+
+};
+
+Singleton * Singleton::local_instance = nullptr;//值得注意
+
+
+int main() 
+{    
+    // Singleton * s1 = Singleton::getInstance();
+    // Singleton * s2 = Singleton::getInstance();
+    // Singleton::delete_local();
+    return 0;
+}
+```
+
+结果：
+
+没有任何输出结果
+修改主函数：
+
+```c++
+int main() 
+{    
+    Singleton * s1 = Singleton::getInstance();
+    Singleton * s2 = Singleton::getInstance();
+    // Singleton::delete_local();
+    return 0;
+}
+```
+
+结果：
+
+```c++
+构造
+new 新空间
+空间不变
+```
+
+继续修改主函数：
+
+```c++
+int main() 
+{    
+    Singleton * s1 = Singleton::getInstance();
+    Singleton * s2 = Singleton::getInstance();
+    Singleton::delete_local();
+    return 0;
+}
+```
+
+结果：
+
+```c++
+构造
+new 新空间
+空间不变
+析构
+```
+
+结论：
+
+懒汉模式中，主函数中没有对这个类操作时，不会调用构造函数。在第一次调用是new新空间，调用构造函数，但是由于new的空间没有delete，所以无法调用析构函数。进一步修改主函数之后，就可以进行析构了。
+
+
 ### 18. const
 
-（1）修饰普通变量，创建时必须初始化，限定变量不可修改（一旦创建就不能再修改）。）
+（1）修饰普通变量，创建时必须初始化，限定变量不可修改（一旦创建就不能再修改。）
 
 ```C++
 int a = 2, b = 3;
@@ -1982,7 +2474,9 @@ int &r1 = a;         // ×
 
 （3）修饰函数返回值，常用于运算符重载，使函数调用表达式不能作为左值。
 
-（4）放在类的成员函数后面，修饰类的成员函数，限定在该函数内不能修改对象的数据成员，并且不能调用非 const 函数（因为非 const 函数可能修改数据成员，而 const 成员函数是不能修改数据成员的，所以在 const 函数中只能调用 const 函数）。静态函数没有this指针，不能定义为虚函数。
+（4）放在类的成员函数后面，**修饰类的成员函数，限定在该函数内不能修改对象的数据成员，**并且不能调用非 const 函数（因为非 const 函数可能修改数据成员，而 const 成员函数是不能修改数据成员的，所以在 const 函数中只能调用 const 函数）。静态函数没有this指针，不能定义为虚函数。
+
+const除了修饰函数时放在函数后面，其他时候都是放在前面的。
 
 
 
@@ -2150,9 +2644,1632 @@ else
     cout << "big-endian" << endl;     // 4个字节（从低地址到高地址）0 0 0 1（大端）
 ```
 
+### 26.成员函数的操作符重载
+
+操作符重载分为成员操作符重载（number function）和非成员操作符重载（non-number functon），并不是所有的操作符都可以进行非成员函数操作符重载的，具体可以参考官网：http://www.cplusplus.com/doc/tutorial/templates/
+
+简单代码示例如下：
+
+```c++
+
+#include <iostream>
+using namespace std;
+ 
+class complex
+{
+private:
+    int re;
+    int im;
+public:
+    complex(int r ,int i ); //错误写法， complex(int r = 0,int i = 0 );
+    ~complex();
+    inline int real() const { return re;} //内联函数
+    inline int imag() const { return im;}
+    complex  operator+ (complex &n);
+ 
+};
+ 
+complex::complex(int r = 0 ,int i = 0 )
+    : re (r),im (i)   //构造函数的初始化列表
+{
+    //re = r;
+    //im = i;
+}
+ 
+complex::~complex()
+{
+}
+ 
+complex  complex::operator+ (complex &n)//成员函数的操作符重载
+{
+    return complex (this->real() + n.real(),this->imag() + n.imag());   
+}
+ 
+ostream & operator<<(ostream &os,complex &n)//非成员函数的操作符重载
+{
+    os << n.real() << "+" << n.imag() << "i";
+    return os; 
+}
+ 
+main()
+{
+    complex a(4,5);
+    complex b(1,1);
+    complex c = a+b;
+    cout << c << endl;
+    //cout << a+b << endl; a+b，这样的语句创建的是一个临时对象，我们可以进行传值、赋值的操作，但是不能传引用。所以用临时对象的方式会报错。
+    return 0;
+}
+```
+
+上个博客说过，成员函数的操作符重载就好比是一个函数，造作符左右两个变量，分别对应函数的第一个和第二个形参，这样是很容易理解的。但是成员函数的操作符重载函数只有一个参数，这就十分奇怪啦。其实编译器在编译到成员函数的时候，会做如下操作：
+
+```c++
+class a;
+class b;
+class c;
+ 
+c = a + b;//编译前
+// c = a.operator+b;//编译后
+```
+
+这样就容易理解多了，基于这种原因，成员函数操作符重载的写法有很多种，如下：
+
+```c++
+complex  complex::operator+ (complex &n)
+{
+    return complex (this->real() + n.real(),this->imag() + n.imag());   
+}
+
+complex  complex::operator+ (complex &n)
+{
+    return complex (real() + n.real(),imag() + n.imag());   
+}
+
+complex  complex::operator+ (complex &n)
+{
+    return complex (re + n.re,im + n.im);   
+}
+```
+
+对上面三段代码进行一下解释：
+
+1. complex()，这个是创建了一个临时对象，临时对象没有名字，用来传值之后就会死亡。因此这里的函数返回用的是传值，而非传引用。
+2. n.re，第三种我写了这种形式，对于private中的成员变量来说，我们在正常使用是不能这样写的，但是在定义成员函数就可以这样使用。
+3. 第一种方法我们引入了this指针，之后我们会再来做探讨。
+
+### 27.C++中传值、传引用、传地址
+
+1. 传值：只是利用了原变量的值，不会对原变量有任何影响。
+2. 传引用：相当于给原变量起了个别名，原变量和新变量对应同一个值，因此对新变量的操作会影响到原变量。
+3. 传地址：其实还是一种传值的操作，特殊的地方是传递的值是原变量的地址,由于这个地址指向原变量，所以通过这个地址可以改变原变量的值。
+
+**传地址：**
+
+```c++
+#include <iostream>
+using namespace std;
+ 
+int use_pointer(int *p)
+{
+    *p += 1;
+    cout << *p <<endl;
+    return *p;
+}
+ 
+main()
+{
+    int a = 6;
+    cout << a << endl;
+    int b = use_pointer(&a);
+    return 0;
+}
+```
+
+输出结果
+
+```c++
+a的值是6
+a的值是7
+```
+
+**传值**：
+
+```c++
+#include <iostream>
+using namespace std;
+ 
+int use_value(int n)
+{
+    n += 1;
+    return n;
+}
+ 
+main()
+{
+    int a = 6;
+    cout << "a的值是" << a << endl;
+    int b = use_value(a);
+    cout << "a的值是" << a << endl;
+    return 0;
+}
+```
+
+输出结果：
+
+```c++
+a的值是6
+a的值是6
+```
+
+**传引用：**
+
+```c++
+#include <iostream>
+using namespace std;
+ 
+int use_reference(int &n)
+{
+    n += 1;
+    return n;
+}
+ 
+main()
+{
+    int a = 6;
+    cout << "a的值是" << a << endl;
+    int b = use_reference(a);
+    cout << "a的值是" << a << endl;
+    return 0;
+}
+```
+
+总结：在C++程序的编写过程中，尽可能采用引用的方式，因为引用既有良好的接口性（在调用函数时，用户不用搞清楚函数是传值还是传引用，只需要传入变量名就可以，如果为了保证原变量不被修改可以用const来修饰。）又有很好的效率（传引用的复杂度只是传递了一个指针，而不是传递整包数据。）
+
+### 28.关于typename和size_t
+
+```c++
+typedef  typename std::vector<T>::size_type size_type;
+```
+
+c++ premier中多次出现上面的代码，让人看了似曾相识，但是有觉得什么都不是，因为这里包含了好几个知识点，让我来慢慢解答。
+1.独立于对象存在的类成员
+首先来看这句：
+
+```c++
+std::vector<T>::size_type
+要想知道上面的代码什么意思，当我们看一下STL中vector类是怎么写的就明白啦：
+
+template <class T,class Alloc=alloc>
+class vector{
+public:
+    //...
+    typedef size_t size_type;
+    //...
+};
+```
+
+其实`size_type`就是`size_t`（size_t是什么，下面会讲到）。
+
+`std::vector<T>::size_type`，这种直接用类名加成员的写法，让我想起来了类静态变量，类静态函数的用法。（静态变量，静态函数可以看我关于static的博客）。于是我做了总结；
+
+```
+静态数据成员 
+静态成员函数 
+嵌套类型
+```
+
+上面这三种情况，**都可以用类名加成员的写法来用**， `typedef size_t size_type;`这句话就是嵌套类型，`std::vector<T>::size_type`，这句就是引用，显然它是独立于对象存在的类成员。
+
+**typename**
+那么问题就来了，上面三种类型都可以用`std::vector<T>::size_type`这种形式来引用，那么编译器要怎么才能分清这个是类的嵌套类型，还是静态数据成员呢？我们就用typename来告诉编译器我这个是一个嵌套类型，这样就解决了定义不明确的问题了。
+
+**size_t**
+这是一个很重要的概念，网上也有很多解释，但是写的是云里雾里的，我就说一下我的理解：
+
+```c++
+template <typename T>
+class Blob{
+	public:
+		typedef T value_type;
+		typedef  typename std::vector<T>::size_type size_type;
+		Blob();
+		Blob(std::initializer_list<T> il) :data(make_shared<std::vector<T>>(il)) {}
+		size_type size() const { return data->size();}
+		bool empty() const { return data->empty();}
+		void push_back(const T& t) {data->push_back(t);}
+	private:
+		std::shared_ptr<std::vector<T>> data;
+};
+```
+
+这c++ premier中的一段代码，其实我们在STL经常见到size_type而很少见到size_t，经过上面的解释我们就知道了，size_type只是size_t的一个别名，其实是一个东西。上面的代码我们可以看到size_type作为vector的size()返回类型，这也是size_type最常用的一种用法，下面继续解释。
+
+```c++
+int A[i];
+std::vector<int> V[i];
+```
+
+如上面例子，大家有没有想过一个数组，一个vector最多有几个元素，这就跟i是什么类型有关了，先告诉你，i的类型就是size_t（很多地方说size_t就是unsigned int，但是这不重要），也就是说，**我们抽象出来一个类型size_t专门来表示一个序列对象的元素的多少**（有人说这与地址的位数有关，但是这也不重要）。我们这样抽象出来的size_t类型有很多好处：
+
+1. 增加程序的可移植性。不同的环境下int 或者unsigned int这些内置类型的字节数是不同的，如果我们用int定义了数组的大小，而用unsigned int去索引，在我们的环境中程序可以运行，但是换了环境可能就会出现bug
+2. 如果size_t报错，我们立刻就知道是数组大小出了问题。
+
+### 29.c++中的初始化
+
+```c++
+#include<iostream>
+using namespace std;
+ 
+class complex{
+	private:
+		int re;
+		int im;
+	public:
+		complex(int r,int i) :re(r), im(i) { }
+};
+ 
+int main(){
+	
+	int i = 0;
+	int j(0);
+	complex c(3,4);
+	return 0;
+}
+```
+
+从c语言过来的同学，在初始化的时候我们用的都是等号“=”，然而c++其实已经不再使用这种方式来初始化啦，**因为作为面向对象的语言，对象往往比较复杂，很少只包含单值的**，之所以在现在还能看到c++中还有这样使用的，是因为为了兼容c语言。之前对构造函数的初始化列表的写法，表示很困惑，现在明白啦。这才是c++真正的初始化方式。
+
+### 30.文件读写
+
+```c++
+#include<iostream>
+#include<fstream>
+ 
+using namespace std;
+ 
+int main(){
+	string str;
+	int n;
+	int m;
+	ofstream outfile("my_file.txt");
+	if(outfile){
+			outfile << "helloworld!" << " " << 1 << " " << 2 << endl;
+			outfile << "hello!" << " " << 3 << " " << 4 << endl;
+			outfile << "world!" << " " << 5 << " " << 6 << endl;
+	}
+	else{
+		cout << "error:failed to open file!" << endl;
+	}
+	
+	ifstream infile("my_file.txt");
+	
+	while(infile >> str){
+		infile >> n;
+		infile >> m;
+		cout << str << "  " << n << "  " << m << endl;
+	}
+	
+	return 0;
+}
+```
+
+结果：
+
+```c++
+helloworld!  1  2
+hello!  3  4
+world!  5  6
+```
+
+解释：
+
+上面的代码主要用了两个类，ofstream和ifstream,都存在头文件#include<fstream>里。
+
+```c++
+ofstream outfile("my_file.txt");
+```
+
+这句话的作用就是，定义一个名叫outfile的对象，并打开“my_file。txt”文件，如果程序找不到这个文件就会新建这个文件，这种打开文件的方式会将文件之前的内容给全部清空，如果想要保留文件的内容，并且添加新的内容，就需要用append模式，应该这样写：
+
+```c++
+ofstream outfile("my_file.txt",ios_base::app);
+```
+
+如果成功打开文件，outfile = true,如果打开失败，outfile = flase.写文件的操作类似于std::cout的操作。
+
+值得注意的是，endl，会插入一个换行。
+
+```c++
+if(outfile){
+			outfile << "helloworld!" << " " << 1 << " " << 2 << endl;
+			outfile << "hello!" << " " << 3 << " " << 4 << endl;
+			outfile << "world!" << " " << 5 << " " << 6 << endl;
+	}
+	else{
+		cout << "error:failed to open file!" << endl;
+	}
+```
+
+对于读文件，；类似于std::cin的操作，值得注意的是，infile >> str ,返回的是写入的字符，文档结尾为0，返回的也是0
+
+```c++
+ifstream infile("my_file.txt");
+while(infile >> str){
+	infile >> n;
+	infile >> m;
+	cout << str << "  " << n << "  " << m << endl;
+}
+```
+
+### 31.类型安全
+
+**1、什么是类型安全**
+
+类型安全简单来说就是访问可以被授权访问的[内存](https://so.csdn.net/so/search?q=内存&spm=1001.2101.3001.7020)位置，类型安全的代码不会试图访问自己未被授权的内存区域。一方面，类型安全被用来形容编程语言，主要根据这门编程语言是否提供类型安全的保障机制；另一方面，类型安全也可以用来形容程序，根据这个程序是否隐含类型错误。类型安全的语言和程序之前，其实没有必然的联系。类型安全的语言，使用不当，也可能写出来类型不安全的程序；类型不安全的语言，使用得当，也可以写出非常安全的程序。
+
+**2、C的类型安全**
+
+**C语言不是类型安全的语言**，原因如下：
+
+1）很多情况下，会存在类型隐式转换，比如bool自动转成int类型；
+
+2）malloc函数返回的是void *的空类型指针，通常需要这样的显示类型转换`char* pStr=(char*)malloc(100*sizeof(char))`，类型匹配没有问题。但如果出现`int* pInt=(int*)malloc(100*sizeof(char))`这样的转换，可能会带来一些问题，但C并不会提示。
+
+当然，在有些情况下表现还是类型安全的，当从一个结构体指针转换成另一个结构体指针时，编译器会报错，除非显式转换。
+
+**3、C++的类型安全**
+
+**C++也不是类型安全的语言，但远比C更具类型安全。相比于C，提供了一些安全保障机制：**
+
+1）用操作符new来申请内存，严格与对象类型匹配，而malloc是void *；
+
+2）函数参数为void *的可以改写成模板，模板支持运行时检查参数类型；
+
+3）使用const代替define来定义常量，具有类型、作用域，而不是简单的文本替换；
+
+4）使用inline代替define来定义函数，结合函数的重载，在类型安全的前提下可以支持多种类型，如果改写成模板，会更安全；
+
+5）提供dynamic_cast使得转换过程更安全。
+
+尽管如此，但如果使用空类型指针或者在两个不同类型指针间做强制转换，很可能引发类型不安全的问题。
 
 
-## 五. 操作系统
+
+### 32.强类型 弱类型
+
+这里解释一下强类型语言和弱类型语言：
+强类型语言也称为强类型定义语言。是一种总是强制类型定义的语言，要求变量的使用要严格符合定义，所有变量都必须先定义后使用。
+
+**java、.NET、C/C++等都是强制类型定义的**。也就是说，一旦一个变量被指定了某个数据类型，如果不经过强制转换，那么它就永远是这个数据类型了。
+
+例如你有一个整数，如果不显式地进行转换，你不能将其视为一个字符串。
+
+与其相对应的是弱类型语言：数据类型可以被忽略的语言。它与强类型定义语言相反, 一个变量可以赋不同数据类型的值。
+
+
+
+
+### 33.c++进程与线程
+
+**进程与线程的区别和联系**
+
+| 对比     | 进程 Process                                                 | 线程 Thread                                                  |
+| -------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| 定义     | 进程是程序运行的一个实体的运行过程，是系统进行资源分配和调配的一个独立单位 | 线程是进程运行和执行的最小调度单位                           |
+| 系统开销 | 创建撤销切换开销大，资源要重新分配和收回                     | 仅保存少量寄存器的内容，开销小，在进程的地址空间执行代码     |
+| 拥有资产 | 资源拥有的基本单位                                           | 基本上不占资源，仅有不可少的资源（程序计数器，一组寄存器和栈） |
+| 调度     | 资源分配的基本单位                                           | 独立调度分配的单位                                           |
+| 安全性   | 进程间相互独立，互不影响                                     | 线程共享一个进程下面的资源，可以互相通信和影响               |
+| 地址空间 | 系统赋予的独立的内存地址空间                                 | 由相关堆栈寄存器和和线程控制表TCB组成，寄存器可被用来存储线程内的局部变量 |
+
+简单来说，
+进程 `Process` 是在系统中正在运行的应用程序；某软件一旦运行就是一个进程，如浏览器；进程是资源分配的最小单位，是线程的容器。一个进程可以包含多个线程，但肯定存在 主线程 MainThread。
+
+线程` Thread` 是系统分配处理器时间资源（调度）的基本单元，包含在进程中，是进程中实际运作的最小单元。一个进程中的多个线程可以相互通信、内存共享，每条线程并行执行不同的任务。
+
+**进程间通信**
+进程间通信方式有很多，网上一说有十几种。面试的时候说上以下几种差不多：
+① 管道：半双工的通信方式，数据只能单向流动，且只能在有亲缘关系（父子进程或兄弟进程）的进程间使用；
+② 命名管道：FIFO，半双工的通信方式，但允许在无亲缘关系的进程间通信；
+③ 消息队列：消息的链表，存放在内核中，并由消息队列标识符标识。消息队列克服了信号传递信息少、管道只能承载无格式字节流以及缓冲区大小受限等缺点；
+④ 信号量：是一个计数器，用于控制多个进程间对共享资源的访问；
+⑤ 共享内存：映射一段能被其他进程访问的内存，这段内存由一个进程创建，但多个进程都可以访问；
+⑥ 套接字
+
+**线程间通信方式**
+多个线程在处理同一个资源，并且任务不同时，需要线程通信来帮助解决线程之间对同一个变量的使用或操作。就是多个线程在操作同一份数据时， 避免对同一共享变量的争夺。
+① 锁机制：包括互斥锁、条件变量、读写锁
+
+```c++
+- 互斥锁提供了以排他方式防止数据结构被并发修改的方法。
+- 读写锁允许多个线程同时读共享数据，而对写操作是互斥的。
+- 条件变量可以以原子的方式阻塞进程，直到某个特定条件为真为止。对条件的测试是在互斥锁的保护下进行的。条件变量始终与互斥锁一起使用。
+```
+
+② 信号量机制(Semaphore)：包括无名线程信号量和命名线程信号量
+③ 信号机制(Signal)：类似进程间的信号处理
+
+线程间的通信目的主要是用于线程同步，所以线程没有像进程通信中的用于数据交换的通信机制。
+
+### 34.c++ 线程池
+
+**1、线程池的作用**
+        频繁的创建和销毁线程会产生大量的程序资源消耗。**使用线程池来管理线程的创建和销毁， 有助于提高线程创建和销毁过程的效率**。线程池的本质就是提前创建一堆线程，在程序需要使用线程来执行任务的时候，将任务放置到线程池中交给未执行任务的线程执行，从而提高了程序的运行效率，提高了线程的利用率。
+
+线程池采用**预创建**的技术，**在应用程序启动之后，将立即创建一定数量的线程(N1)，放入空闲队列中。这些线程都是处于阻塞（Suspended）状态，不消耗CPU**，但占用较小的内存空间。
+
+**总之线程池通常适合下面的几个场合：**
+(1)单位时间内处理任务频繁而且任务处理时间短
+(2)对实时性要求较高。如果接受到任务后在创建线程，可能满足不了实时要求，因此必须采用线程池进行预创建。
+
+### 35.c++ 多线程---线程安全
+
+当使用多线程时，可能存在同时访问一个变量，导致变量被污染问题，所以需要通过编程克服这个问题。
+
+**同时访问一个数据示例**
+
+采用多个线程，分别记数，然后查看最终计算结果，代码如下：
+
+```c++
+#include <iostream>
+#include <thread>
+#include <time.h>
+
+//计数全局变量
+long cnt = 0;
+
+//计数程序
+void counter()
+{
+	for (int i = 0; i < 100000; ++i)
+	{
+		++cnt;
+	}
+}
+
+int main(int argc, char* argv[])
+{
+	//开始计时
+	clock_t start = clock();
+
+	//创建线程
+	std::thread threads[100];
+
+	//调用记数函数
+	for (int i = 0; i != 100; ++i)
+	{
+		threads[i] = std::thread(counter);//往线程中塞入任务函数
+	}
+
+	//等待操作
+	for (auto& th : threads)
+		th.join();
+
+	clock_t finish = clock();
+
+	std::cout << "期望结果:" << 100 * 100000 << std::endl;
+	std::cout << "实际结果:" << cnt << std::endl;
+	std::cout << "duration:" << finish - start << "ms" << std::endl;
+	
+	return 0;
+}
+
+```
+
+运行结果：
+
+```c++
+期望结果：10000000
+实际结果: 9400000
+duration:104ms
+```
+
+可以看出，存在数据丢失问题，其原因是同时访问变量cnt导致，所以，需要采用编程方法，保证每次只能有一个程序访问cnt变量。
+
+**采用互斥锁mutex**
+在 C++11中，mutex是标准库， 调用`#include < mutex>`头文件调用，其主要类为std::mutex，其成员函数包括:
+
+**1.构造函数**
+构造函数，std::mutex不允许拷贝构造，也不允许 move 拷贝，最初产生的 mutex 对象是处于 unlocked 状态的。
+
+**2.lock()函数**
+lock()，调用线程将锁住该互斥量。线程调用该函数会发生下面 3 种情况：
+(1). 如果该互斥量当前没有被锁住，则调用线程将该互斥量锁住，直到调用 unlock之前，该线程一直拥有该锁。
+(2). 如果当前互斥量被其他线程锁住，则当前的调用线程被阻塞住。
+(3). 如果当前互斥量被当前调用线程锁住，则会产生死锁(deadlock)。
+
+**3.unlock()函数**
+unlock()， 解锁，释放对互斥量的所有权。
+
+**4.try_lock()函数**
+try_lock()，尝试锁住互斥量，如果互斥量被其他线程占有，则当前线程也不会被阻塞。线程调用该函数也会出现下面 3 种情况：
+(1). 如果当前互斥量没有被其他线程占有，则该线程锁住互斥量，直到该线程调用 unlock 释放互斥量。
+(2). 如果当前互斥量被其他线程锁住，则当前调用线程返回 false，而并不会被阻塞掉。
+(3). 如果当前互斥量被当前调用线程锁住，则会产生死锁(deadlock)。
+互斥变量参照：c++ 11 多线线程系列-----------原子操作（atomic operation)
+
+示例代码如下：
+
+```c++
+#include <iostream>
+#include <thread>
+#include <time.h>
+#include <mutex> //添加互斥变量头文件
+
+//创建互斥变量锁
+std::mutex my_mutex;
+
+
+//计数全局变量
+long cnt = 0;
+
+//计数程序
+void counter()
+{
+	for (int i = 0; i < 100000; ++i)
+	{
+		//每次计算锁住变量
+		my_mutex.lock();
+		++cnt;
+		my_mutex.unlock();
+	}
+}
+
+
+int main(int argc, char* argv[])
+{
+	//开始计时
+	clock_t start = clock();
+
+	//创建线程
+	std::thread threads[100];
+
+	//调用记数函数
+	for (int i = 0; i != 100; ++i)
+	{
+		threads[i] = std::thread(counter);
+	}
+
+	//等待操作
+	for (auto& th : threads)
+		th.join();
+
+	clock_t finish = clock();
+
+	std::cout << "期望结果:" << 100 * 100000 << std::endl;
+	std::cout << "实际结果:" << cnt << std::endl;
+	std::cout << "duration:" << finish - start << "ms" << std::endl;
+	
+	return 0;
+}
+```
+
+计算结果如下：
+
+```c++
+期望结果：10000000
+实际结果:10000000
+duration:456ms
+```
+
+采用互斥变量后，能准确计算，但是时间从104ms,变到456ms。
+
+**采用原子原子操作atomic**
+atomic是C++标准程序库中的一个头文件，定义了C++11标准中的一些表示线程、并发控制时原子操作的类与方法等。此头文件主要声明了两大类原子对象：`std::atomic`和`std::atomic_flag`，另外还声明了一套C风格的原子类型和与C兼容的原子操作的函数。在多线程并发执行时，原子操作是线程不会被打断的执行片段。一些程序设计更为注重性能和效率，需要开发lock-free的算法和数据结构，这就需要更为底层的原子操作与原子类型。原子类型对象的主要特点就是从不同线程并发访问是良性(well-defined)行为，不会导致竞争危害。与之相反，不做适当控制就并发访问非原子对象则会导致未定义(undifined)行为。
+
+**atomic_flag类：**
+atomic_flag类是一种简单的原子布尔类型，只支持两种操作：test_and_set(flag=true)和clear(flag=false)。跟std::atomic的其它所有特化类不同，它是锁无关的。结合std::atomic_flag::test_and_set()和std::atomic_flag::clear()，std::atomic_flag对象可以当作一个简单的自旋锁(spin lock)使用。
+(1) `atomic_flag`只有默认构造函数，禁用拷贝构造函数，禁用移动构造函数实，如果在初始化时没有明确使用宏ATOMIC_FLAG_INIT初始化，那么新创建的std::atomic_flag对象的状态是未指定的(unspecified)，既没有被set也没有被clear；如果使用该宏初始化，该std::atomic_flag对象在创建时处于clear状态。
+(2) `test_and_set`：返回该std::atomic_flag对象当前状态，检查flag是否被设置，若被设置直接返回true，若没有设置则设置flag为true后再返回false，该函数是原子的。
+(3) `clear`：清除std::atomic_flag对象的标志位，即设置atomic_flag的值为false。
+
+**std::atomic类模板：**
+`std::atomic`比`std::atomic_flag`功能更加完善。C++11标准库std::atomic提供了针对bool类型、整形(integral)和指针类型的特化实现。每个std::atomic模板的实例化和完全特化定义一个原子类型。若一个线程写入原子对象，同时另一个线程从它读取，则行为良好定义。而且，对原子对象的访问可以按std::memory_order所指定建立线程间同步，并排序非原子的内存访问。std::atomic可以以任何复制(Trivially Copyable)的类型T实例化。std::atomic既不可复制亦不可移动
+
+**原子对象初始化相关的两个宏：**
+(1) ATOMIC_VAR_INIT(val)：初始化std::atomic对象。
+(2) ATOMIC_FLAG_INIT：初始化std::atomic_flag对象。
+示例代码：
+
+```c++
+#include <iostream>
+#include <thread>
+#include <time.h>
+#include <atomic> //添加原子操作头文件
+
+//创建原子操作变量
+std::atomic_long cnt;
+
+
+//计数程序
+void counter()
+{
+	for (int i = 0; i < 100000; ++i)
+	{
+		++cnt;
+	}
+}
+
+
+int main(int argc, char* argv[])
+{
+	//开始计时
+	clock_t start = clock();
+
+	//创建线程
+	std::thread threads[100];
+
+	//调用记数函数
+	for (int i = 0; i != 100; ++i)
+	{
+		threads[i] = std::thread(counter);
+	}
+
+	//等待操作
+	for (auto& th : threads)
+		th.join();
+
+	clock_t finish = clock();
+
+	std::cout << "期望结果：" << 100 * 100000 << std::endl;
+	std::cout << "实际结果:" << cnt << std::endl;
+	std::cout << "duration:" << finish - start << "ms" << std::endl;
+	
+	return 0;
+}
+```
+
+运行结果：
+
+```c++
+期望结果：10000000
+实际结果:10000000
+duration:228ms
+```
+
+结果表明，采用原子变量能保证运算结果正确，且能相对于互斥变量mutex,运算速度明显提高。
+
+### 36.join()
+
+用于多线程环境中，保证程序后续处理能正常执行，join()会阻塞线程环境，直到线程对象执行完传入的方法，总结理解一下就是两个关键点：
+
+- **谁调用了这个函数？**调用了这个函数的线程对象，一定要等这个线程对象的方法（在构造时传入的方法）执行完毕后（或者理解为这个线程的活干完了！），这个join()函数才能得到返回。
+- **在什么线程环境下调用了这个函数？**上面说了必须要等线程方法执行完毕后才能返回，那必然是阻塞调用线程的，也就是说如果一个线程对象在一个线程环境调用了这个函数，那么这个线程环境就会被阻塞，直到这个线程对象在构造时传入的**方法**执行完毕后，才能继续往下走，另外如果线程对象在调用join()函数之前，就已经做完了自己的事情（在构造时传入的方法执行完毕），那么这个函数不会阻塞线程环境，线程环境正常执行。
+
+
+
+### 37.c++ 工厂模式
+
+工厂模式(统称)
+工厂模式是一种创建型模式，适用场景：安全的创建对象。
+
+**顾名思义，工厂是用来生产东西的，而在C++里面就是用来生产对象的。**
+就像一家餐厅一样，你可以按照你的方式来点餐。在工厂模式中也一样，你可以要求工厂为你生产不同的对象。
+闲话不多说，直接上代码！
+
+**简单工厂模式：**
+
+```c++
+#include<iostream>
+#include<string>
+using namespace std;
+class Produce;//声明产品类 
+class Factory;//声明工厂类 
+class Factory
+{
+	public:
+		Factory(){
+		}
+		~Factory(){
+		}
+		virtual Produce* create_produce(string class_name,string name)=0;
+											//工厂生产产品,这里的纯虚函数是为了让子工厂生产产品
+											//返回的是一个产品类指针，这就代表了一个产品
+											//这里的name参数是为了返回想要的产品qwq 
+};
+class Produce
+{
+	public:
+		Produce(){
+		}
+		~Produce(){
+		}
+		virtual void show_myname()=0;//这里定义的纯虚函数是为了让派生类去实现这个函数，有纯虚函数的类是抽象类 
+};
+//现在我要开始创建具体的产品了
+class Produce_apple:public Produce//这是一个具体的苹果类 
+{
+	private:
+		string name;
+	public:
+		Produce_apple(string new_name="")
+		{
+			this->name = new_name;
+		}
+		virtual void show_myname()//重写父类函数 
+		{
+			cout<<"我的名称是："<<name<<endl;
+		}
+};
+class Produce_pear:public Produce//这是一个具体的梨类 
+{
+	private:
+		string name;
+	public:
+		Produce_pear(string new_name="")
+		{
+			this->name = new_name;
+		}
+		virtual void show_myname()//重写父类函数
+		{
+			cout<<"我的名称是："<<name<<endl;
+		}
+};
+class Produce_badfruits:public Produce//这是一个具体的坏水果类 
+{
+	private:
+		string name;
+	public:
+		Produce_badfruits(){
+		}
+		virtual void show_myname()//重写父类函数
+		{
+			cout<<"此产品已经过期！！"<<endl;
+		}
+};
+//下面开始创建具体的工厂类 
+class Factory_fruits:public Factory//这是个水果工厂类
+{
+	public:
+		Factory_fruits(){
+		}
+		~Factory_fruits(){
+		}
+		virtual Produce* create_produce(string class_name,string name)
+		{
+			if (class_name=="apple")
+			{
+				Produce * my_produce = new Produce_apple(name);//创建name的apple产品 
+				return my_produce;
+			}
+			else if (class_name=="pear")
+			{
+				Produce * my_produce = new Produce_pear(name);//创建name的pear产品
+				return my_produce;
+			}
+			else
+			{
+				Produce * my_produce = new Produce_badfruits();//创建name的pear产品
+				return my_produce;
+			}
+		}
+};
+//初期的搭建工作已经完成，总结一下，我们搭建了两个抽象类：工厂类，产品类；
+											    //产品派生类：苹果类，梨类，坏水果类
+												//工厂派生类：水果工厂类。
+												//现在我们要用这些东西了
+int main()
+{
+	Factory * my_factory_fruits = new Factory_fruits();//创建一个抽象工厂对象"升级"为水果工厂
+													//这里的"升级"是我的理解 ,事实上是类型转换 
+	Produce * my_produce_apple = my_factory_fruits->create_produce("apple","红富士");
+	//创建抽象产品对象，"升级"为水果工厂加工出来的apple,红富士 
+	Produce * my_produce_pear = my_factory_fruits->create_produce("pear","冰糖雪梨");
+	//创建抽象产品对象，"升级"为水果工厂加工出来的pear,冰糖雪梨
+	Produce * my_produce_banana = my_factory_fruits->create_produce("banana","大香蕉");
+	//创建抽象产品对象，"升级"为水果工厂加工出来的banana,大香蕉，但是工厂不能生产banana,所以只能生产badfruit坏水果 
+	my_produce_apple->show_myname();
+	//产品显示自己的名称 
+	my_produce_pear->show_myname();
+	//产品显示自己的名称
+	my_produce_banana->show_myname();
+	//产品显示自己的名称
+		
+	//下面是销毁内存
+	delete my_factory_fruits;
+	my_factory_fruits = NULL;
+	delete my_produce_apple;
+	my_produce_apple = NULL;
+	delete my_produce_pear;
+	my_produce_pear = NULL;
+	delete my_produce_banana;
+	my_produce_banana = NULL;
+	return 0; 
+} 
+
+```
+
+这是一个简单工厂模式，在实际的程序开发中，可以将那些具体的产品类编译成DLL，这样可以做到热更新！
+
+**工厂模式：**
+顾名思义工厂模式，并没有那么简单qwq.他不是像简单工厂那样一个水果工厂可以生产各种水果，而是一种工厂生产一种水果。就比如苹果工厂生产苹果，梨子工厂生产梨子。这样分开的好处是什么呢？？？
+我看了很多博客，他们都提到了 开放-封闭原则，我用我自己的话来说，就是如果你想增加新西瓜的产品的话。用简单工厂模式需要增加一个西瓜类，然后在水果工厂里面增加分支。用工厂模式的话需要增加一个西瓜类和一个西瓜类工厂。。。
+但是我们的老师经常教导我们，不要改源码！！！如果用的是简单工厂模式就必须改源码中的条件分支，这会被老师骂死的qwq。所以用工厂模式就不用改源码，只用增加代码即可，妈妈再也不用担心我被骂了。
+上代码！！
+
+```c++
+#include<iostream>
+#include<string>
+using namespace std;
+class Produce;//声明产品类 
+class Factory;//声明工厂类 
+class Factory
+{
+  public:
+  	Factory(){
+  	}
+  	~Factory(){
+  	}
+  	virtual Produce* create_produce(string name)=0;
+  										//工厂生产产品,这里的纯虚函数是为了让子工厂生产产品
+  										//返回的是一个产品类指针，这就代表了一个产品
+  										//这里的name参数是为了返回想要的产品qwq 
+};
+class Produce
+{
+  public:
+  	Produce(){
+  	}
+  	~Produce(){
+  	}
+  	virtual void show_myname()=0;//这里定义的纯虚函数是为了让派生类去实现这个函数，有纯虚函数的类是抽象类 
+};
+//现在我要开始创建具体的产品了
+class Produce_apple:public Produce//这是一个具体的苹果类 
+{
+  private:
+  	string name;
+  public:
+  	Produce_apple(string new_name="")
+  	{
+  		this->name = new_name;
+  	}
+  	virtual void show_myname()//重写父类函数 
+  	{
+  		cout<<"我的名称是："<<name<<endl;
+  	}
+};
+class Produce_pear:public Produce//这是一个具体的梨类 
+{
+  private:
+  	string name;
+  public:
+  	Produce_pear(string new_name="")
+  	{
+  		this->name = new_name;
+  	}
+  	virtual void show_myname()//重写父类函数
+  	{
+  		cout<<"我的名称是："<<name<<endl;
+  	}
+};
+class Produce_banana:public Produce//这是一个具体的坏水果类 
+{
+  private:
+  	string name;
+  public:
+  	Produce_banana(string new_name="")
+  	{
+  		this->name = new_name;
+  	}
+  	virtual void show_myname()//重写父类函数
+  	{
+  		cout<<"我的名称是："<<name<<endl;
+  	}
+};
+//下面开始创建具体的工厂类 
+class Factory_apple:public Factory//这是个水果工厂类
+{
+  public:
+  	Factory_apple(){
+  	}
+  	~Factory_apple(){
+  	}
+  	virtual Produce* create_produce(string name)
+  	{
+  		Produce * my_produce = new Produce_apple(name);//创建name的apple产品 
+  		return my_produce;
+  	}
+};
+class Factory_pear:public Factory//这是个水果工厂类
+{
+  public:
+  	Factory_pear(){
+  	}
+  	~Factory_pear(){
+  	}
+  	virtual Produce* create_produce(string name)
+  	{
+  		
+  		Produce * my_produce = new Produce_pear(name);//创建name的pear产品 
+  		return my_produce;
+  	}
+};
+class Factory_banana:public Factory//这是个水果工厂类
+{
+  public:
+  	Factory_banana(){
+  	}
+  	~Factory_banana(){
+  	}
+  	virtual Produce* create_produce(string name)
+  	{
+  		
+  		Produce * my_produce = new Produce_banana(name);//创建name的badfruits产品 
+  		return my_produce;
+  	}
+};
+//初期的搭建工作已经完成，总结一下，我们搭建了两个抽象类：工厂类，产品类；
+  										    //产品派生类：苹果类，梨类，坏水果类
+  											//工厂派生类：苹果工厂类。梨类工厂类。坏水果工厂类 
+  											//现在我们要用这些东西了
+int main()
+{
+  Factory * my_factory_apple = new Factory_apple();//创建一个抽象工厂对象"升级"为苹果工厂
+  												//这里的"升级"是我的理解 ,事实上是类型转换
+  Factory * my_factory_pear = new Factory_pear();//创建一个抽象工厂对象"升级"为梨子工厂
+  												
+  Factory * my_factory_banana = new Factory_banana();//创建一个抽象工厂对象"升级"为香蕉工厂
+  												
+  Produce * my_produce_apple = my_factory_apple->create_produce("红富士");
+  //创建抽象产品对象，"升级"为苹果工厂加工出来的apple,红富士 
+  Produce * my_produce_pear = my_factory_pear->create_produce("冰糖雪梨");
+  //创建抽象产品对象，"升级"为梨子工厂加工出来的pear,冰糖雪梨
+  Produce * my_produce_banana = my_factory_banana->create_produce("大香蕉");
+  //创建抽象产品对象，"升级"为香蕉工厂加工出来的banana 
+  my_produce_apple->show_myname();
+  //产品显示自己的名称 
+  my_produce_pear->show_myname();
+  //产品显示自己的名称
+  my_produce_banana->show_myname();
+  //产品显示自己的名称
+  	
+  //下面是销毁内存
+  delete my_factory_apple;
+  my_factory_apple = NULL;
+  delete my_factory_pear;
+  my_factory_pear = NULL;
+  delete my_factory_banana;
+  my_factory_banana = NULL;
+  delete my_produce_apple;
+  my_produce_apple = NULL;
+  delete my_produce_pear;
+  my_produce_pear = NULL;
+  delete my_produce_banana;
+  my_produce_banana = NULL;
+  return 0; 
+} 
+```
+
+**抽象工厂模式**
+顾名思义这个模式比普通的工厂模式抽象一点。
+按照我个人的理解，简单工厂模式，工厂模式，抽象模式主要的差别就在与工厂的分类不同。
+简单工厂模式：一个产品一个工厂，十个产品一个工厂。总结：工厂可以生产所有产品
+工厂模式：一个产品一个工厂，十个产品十个工厂。总结：工厂只能生产一个产品
+抽象工厂模式：N个产品M个工厂。总结：工厂可以灵活的生产商品。
+
+还是按刚才的例子，我现在要卖苹果，苹果汁，梨子，梨子汁。
+简单工厂模式就是1个工厂卖四个产品。
+工厂模式就是创建四个工厂卖四个产品。
+抽象工厂模式就不一样：我可以创建两个工厂。一个专门卖苹果类的，一个专门卖梨子类的，除了这样的分类，还可以进行其他的分类，十分的灵活！
+
+闲话不多说，上代码！！
+
+```c++
+#include<iostream>
+#include<string>
+using namespace std;
+class Produce_fruits;//声明水果产品类
+class Produce_fruits_juice;//声明水果汁产品类  
+class Factory;//声明工厂类 
+class Factory
+{
+	public:
+		Factory(){
+		}
+		~Factory(){
+		}
+		virtual Produce_fruits* create_produce(string name)=0;
+											//工厂生产产品,这里的纯虚函数是为了让子工厂生产产品
+											//返回的是一个产品类指针，这就代表了一个产品
+											//这里的name参数是为了返回想要的产品qwq
+		virtual Produce_fruits_juice* create_produce_juice(string name)=0;
+											//工厂生产产品,这里的纯虚函数是为了让子工厂生产产品
+											//返回的是一个产品类指针，这就代表了一个产品
+											//这里的name参数是为了返回想要的产品qwq 
+};
+class Produce_fruits
+{
+	public:
+		Produce_fruits(){
+		}
+		~Produce_fruits(){
+		}
+		virtual void show_myname()=0;//这里定义的纯虚函数是为了让派生类去实现这个函数，有纯虚函数的类是抽象类 
+};
+class Produce_fruits_juice
+{
+	public:
+		Produce_fruits_juice(){
+		}
+		~Produce_fruits_juice(){
+		}
+		virtual void show_myname()=0;//这里定义的纯虚函数是为了让派生类去实现这个函数，有纯虚函数的类是抽象类 
+};
+//现在我要开始创建具体的产品了
+class Produce_apple:public Produce_fruits//这是一个具体的苹果类 
+{
+	private:
+		string name;
+	public:
+		Produce_apple(string new_name="")
+		{
+			this->name = new_name;
+		}
+		virtual void show_myname()//重写父类函数 
+		{
+			cout<<"我的名称是："<<name<<"（水果）"<<endl;
+		}
+};
+class Produce_pear:public Produce_fruits//这是一个具体的梨类 
+{
+	private:
+		string name;
+	public:
+		Produce_pear(string new_name="")
+		{
+			this->name = new_name;
+		}
+		virtual void show_myname()//重写父类函数
+		{
+			cout<<"我的名称是："<<name<<"（水果）"<<endl;
+		}
+};
+class Produce_apple_juice:public Produce_fruits_juice//这是一个具体的苹果类 
+{
+	private:
+		string name;
+	public:
+		Produce_apple_juice(string new_name="")
+		{
+			this->name = new_name;
+		}
+		virtual void show_myname()//重写父类函数 
+		{
+			cout<<"我的名称是："<<name<<"（果汁）"<<endl;
+		}
+};
+class Produce_pear_juice:public Produce_fruits_juice//这是一个具体的梨类 
+{
+	private:
+		string name;
+	public:
+		Produce_pear_juice(string new_name="")
+		{
+			this->name = new_name;
+		}
+		virtual void show_myname()//重写父类函数
+		{
+			cout<<"我的名称是："<<name<<"（果汁）"<<endl;
+		}
+};
+//下面开始创建具体的工厂类 
+class Factory_apple:public Factory//这是个苹果工厂类
+{
+	public:
+		Factory_apple(){
+		}
+		~Factory_apple(){
+		}
+		virtual Produce_fruits* create_produce(string name)
+		{
+			Produce_fruits * my_produce = new Produce_apple(name);//创建name的苹果产品 
+			return my_produce;
+		}
+		virtual Produce_fruits_juice* create_produce_juice(string name)
+		{
+			Produce_fruits_juice * my_produce = new Produce_apple_juice(name);//创建name的苹果汁产品 
+			return my_produce;
+		}
+};
+class Factory_pear:public Factory//这是个梨工厂类
+{
+	public:
+		Factory_pear(){
+		}
+		~Factory_pear(){
+		}
+		virtual Produce_fruits* create_produce(string name)
+		{
+			Produce_fruits * my_produce = new Produce_pear(name);//创建name的梨子产品 
+			return my_produce;
+		}
+		virtual Produce_fruits_juice* create_produce_juice(string name)
+		{
+			Produce_fruits_juice * my_produce = new Produce_pear_juice(name);//创建name的梨子汁产品 
+			return my_produce;
+		}
+};
+//初期的搭建工作已经完成，总结一下，我们搭建了两个抽象类：工厂类，水果产品类，果汁产品类；
+											    //产品派生类：苹果类，梨类，苹果汁类，梨汁类，
+												//工厂派生类：苹果工厂类，梨子工厂类。
+												//现在我们要用这些东西了
+int main()
+{
+	Factory * my_factory_apple = new Factory_apple();//创建一个抽象工厂对象"升级"为苹果工厂
+													//这里的"升级"是我的理解 ,事实上是类型转换
+	Factory * my_factory_pear = new Factory_pear();//创建一个抽象工厂对象"升级"为梨子工厂
+													//这里的"升级"是我的理解 ,事实上是类型转换 
+	Produce_fruits * my_produce_apple = my_factory_apple->create_produce("红富士");
+	//创建抽象产品对象，"升级"为苹果工厂加工出来的红富士 
+	Produce_fruits * my_produce_pear = my_factory_pear->create_produce("鸭梨");
+	//创建抽象产品对象，"升级"为梨子工厂加工出来的鸭梨
+	Produce_fruits_juice * my_produce_apple_juice = my_factory_apple->create_produce_juice("红苹果汁");
+	//创建抽象产品对象，"升级"为苹果工厂加工出来的红苹果汁
+	Produce_fruits_juice * my_produce_pear_juice = my_factory_pear->create_produce_juice("冰糖雪梨果汁");
+	//创建抽象产品对象，"升级"为梨子工厂加工出来的冰糖雪梨果汁 
+	my_produce_apple->show_myname();
+	//产品显示自己的名称 
+	my_produce_pear->show_myname();
+	//产品显示自己的名称
+	my_produce_apple_juice->show_myname();
+	//产品显示自己的名称
+	my_produce_pear_juice->show_myname();
+	//产品显示自己的名称
+	
+	//下面是销毁内存 
+	delete my_factory_apple;
+	my_factory_apple = NULL;
+	delete my_factory_pear;
+	my_factory_pear = NULL;
+	delete my_produce_apple;
+	my_produce_apple = NULL;
+	delete my_produce_pear;
+	my_produce_pear = NULL;
+	delete my_produce_apple_juice;
+	my_produce_apple_juice = NULL;
+	delete my_produce_pear_juice;
+	my_produce_pear_juice = NULL;
+	return 0; 
+} 
+```
+
+**总结:**
+
+```c++
+##### 特点：
+简单工厂模式：一个工厂N个产品
+工厂模式：N个工厂N个产品
+抽象工厂模式：N个工厂M个产品
+##### 缺点（相对）：
+简单工厂模式：违背了开放封闭原则（改动源码），产品多了会比较杂
+工厂模式：产品多了会很杂，代码量稍大，产品多了会比较杂
+抽象工厂模式：违背了开放封闭原则（改动源码），代码量大，产品多了会比较非常杂
+##### 优点（相对）：
+简单工厂模式：代码量小，方便添加新的产品
+工厂模式：不违背了开放封闭原则（不改动源码），方便添加新的产品
+抽象工厂模式：模式灵活，调用方便
+```
+
+在实际开发中可以混用,人的思维是灵活的，代码才是灵活的，功能才是灵活的，不同的工具灵活使用才能发挥出最大的功能
+
+### 38.拷贝构造
+
+拷贝构造：：一种特殊的构造函数，用基于同一类的一个对象构造和初始化另一个对象。
+当没有拷贝构造函数时，通过默认拷贝构造函数来创建一个对象。
+
+```c++
+A a;
+A b(a);
+A b= a;
+```
+
+都是拷贝构造函数来创建对象b。
+
+***\**\*\*\*\*\*\*\*\*\*\*\*\*\*ATTENTION\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\**\****
+**b 对象之前是不存在的，用a对象来构造和初始化b的！！！**
+
+何时调用拷贝构造函数：
+
+1.对象以值传递的方式传入函数内;
+
+2.对象以值传递的方式从函数返回;
+
+3.对象需要通过另一个对象初始化.
+
+**引入一个问题**
+
+```c++
+#include <iostream>
+using namespace std;
+class Test {
+    int i;
+public:
+    Test(int x) {
+        i = x;
+    }
+    Test(const Test& a) {
+        this->i = a.i;
+        cout << "Copy" << endl;
+    }
+};
+Test work() {
+    Test tot(0);
+    return tot;
+}
+/*Test work() {  
+    Test* tot = new Test(1);//这里调用的就是传地址的构造函数
+    return *tot;
+}*/
+int main() {
+    work();
+    return 0;
+}
+```
+
+
+
+***\**\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*ATTENTION\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\**\****
+**系统默认提供的拷贝构造函数的工作方式是[内存](https://so.csdn.net/so/search?q=内存&spm=1001.2101.3001.7020)拷贝—浅拷贝。
+如果对象中用到了需要手动释放的对象，就会出现问题，这时就需要手动重载拷贝构造函数—–实现深拷贝**
+
+浅拷贝： 如果复制的对象中引用以一个外部内容（例如分配在堆上的数据），那么在复制这个对象的时候，让新旧对象指向同一个外部内容，就是浅拷贝。（指针虽然复制了，但所指向的空间内容并没有复制，而是由两个对象共用，两个对象不独立，删除弓箭存在问题）
+
+深拷贝：如果在复制这个对象的时候为新对象制作了外部对象的独立复制，就是深拷贝。
+
+拷贝构造函数重载声明 A(const A& other)
+
+**3.赋值函数**
+
+赋值函数：： 一个类的对象向该类的另一个对象赋值。
+
+当没有重载赋值函数（[赋值运算符](https://so.csdn.net/so/search?q=赋值运算符&spm=1001.2101.3001.7020)）时，通过默认赋值函数来进行赋值操作。
+```c++
+A a;
+A b;
+b =a ;
+```
+
+***\**\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*ATTENTION\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\**\***
+**a, b 对象是已经存在的，用a对象来赋值给b!!!!!!**
+
+赋值运算符的重载声明：
+A& operator = (const A& other)
+
+**拷贝构造函数和赋值函数的区别**
+
+1.拷贝构造函数是一个对象初始化一块内存区域，这块内存就是新对象的内存去，而赋值函数是对于一个已经被初始化的对象进行赋值操作。
+
+2.在数据成员包含指针对象的时候，一种是复制指针对象，另一种是引用指针对象。拷贝构造函数大多数是复制，赋值函数是引用对象。
+
+3.实现不一样。拷贝–是构造函数，通过参数对象，初始化产生一个对象。赋值函数则把一个新的对象赋值给一个原有的对象——所有如果原有的对象中有内存分配要先把内存释放掉，而且还要检查一下两个对象是不是同一个对象，如果是，不做任何操作，直接返回
+
+
+
+
+string 类的完成的3个函数实现
+
+```c++
+#include <string>
+class string
+{
+    string(const char* str);
+    string(const string& ohter);
+    string& operator=(const string& other);
+    ~string();
+private:
+    char* m_data;
+};
+// 构造函数
+string::string(const char* str)
+{
+    if(str == NULL)
+    {
+        m_data = new char[1];
+        m_data = '\n';
+    }
+    else
+    {
+        int strlen = strlen(str);
+        m_data = new char[strlen + 1];
+        strcpy(m_data, str);
+    }
+}
+// 拷贝构造函数
+string::string(const string& other)
+{
+    int strlen = strlen(other.m_data);
+    m_data = new char[strlen +1];
+    strcpy(m_data , other.m_data);
+}
+//赋值函数
+string & string::operator=(const string& other)
+{
+    if(this == &other) //自我检查
+    {
+        return *this;
+    }
+    //删除原有数据内存
+    delete []m_data;
+    int strlen = strlen(other.m_data);
+    m_data = new char[strlen +1];
+    strcpy(m_data ,other.m_data);
+    return 8this;
+}
+// 析构函数
+string::~string()
+{
+    delete []m_data;
+}
+```
+
+**总结:: **
+
+**对象不存在，且没用别的对象来初始化，调用构造函数**
+**对象不存在，且用别的对象来初始化，调用拷贝构造**
+**对象存在，用别的对象给他赋值，就是赋值函数**
+
+
+
+### 39.static_cast
+
+static_cast < type-id > ( expression )
+
+该运算符把expression转换为type-id类型，但没有运行时类型检查来保证转换的安全性。它主要有如下几种用法：
+
+①用于 [类层次结构](http://baike.baidu.com/view/2405425.htm)中基类（父类）和 [派生类](http://baike.baidu.com/view/535532.htm)（子类）之间指针或引用的转换。
+
+进行上行转换（把派生类的指针或引用转换成基类表示）是安全的；
+
+进行下行转换（把基类指针或引用转换成派生类表示）时，由于没有动态类型检查，所以是不安全的。
+
+②用于基本数据类型之间的转换，如把int转换成char，把int转换成enum。这种转换的安全性也要开发人员来保证。
+
+③把空指针转换成目标类型的空指针。
+
+④把任何类型的表达式转换成void类型。
+
+
+
+### 40.override和final
+
+override：必须重载。在函数后面加上override代表此函数重载了父类的同名虚函数。
+
+final：不希望被继承或重载。
+
+### 41.mutable
+
+mutalbe的中文意思是“可变的，易变的”，跟constant（既C++中的const）是反义词。
+
+在C++中，mutable也是为了突破const的限制而设置的。被mutable修饰的变量，将永远处于可变的状态，即使在一个const函数中。
+
+我们知道，如果类的成员函数不会改变对象的状态，那么这个成员函数一般会声明成const的。但是，有些时候，我们需要在const的函数里面修改一些跟类状态无关的数据成员，那么这个数据成员就应该被mutalbe来修饰。
+
+以下代码如果要在matest中进行修改m_a的值，就得在定义const A a，去掉const，并且在A类方法的声明时去掉const，但是mutable可以突破这层限制。
+```c++
+#include <iostream>
+
+using namespace std;
+
+class A
+{
+public:
+	A(int a):m_a(a){}
+	void matest()const;
+	void macout()const
+	{
+		cout << m_a << endl;
+	}
+private:
+	int m_a;
+};
+
+void A::matest() const
+{
+	//m_a = 10;//被const修饰的函数不允许修好任何类状态值(类里面的数据)
+	cout << m_a << endl;
+}
+
+int main()
+{
+	const A a(1);
+	a.macout();//用const修饰的一个类使用一个const修饰的方法
+	return 0;
+}
+```
+
+```c++
+#include <iostream>
+
+using namespace std;
+
+class A
+{
+public:
+	A(int a):m_a(a){}
+	void matest()const;
+	void macout()const
+	{
+		cout << m_a << endl;
+	}
+private:
+	mutable int m_a;
+};
+
+void A::matest() const
+{
+	m_a = 10;//在定义时用mutable来突破这层限制
+	cout << m_a << endl;
+}
+
+int main()
+{
+	const A a(1);
+	a.macout();//用const修饰的一个类使用一个const修饰的方法
+	return 0;
+}
+```
+
+
+
+### 42.function
+
+```c++
+#include <iostream>  
+#include <vector>  
+#include <list>  
+#include <map>  
+#include <set>  
+#include <string>  
+#include <algorithm>  
+#include <functional>  
+#include <memory>  
+using namespace std;  
+  
+//声明一个模板  
+typedef std::function<int(int)> Functional;  
+  
+  
+//normal function  
+int TestFunc(int a)  
+{  
+    return a;  
+}  
+  
+//lambda expression  
+auto lambda = [](int a)->int{return a;};  
+  
+//functor仿函数  
+class Functor  
+{  
+public:  
+    int operator() (int a)  
+    {  
+        return a;  
+    }  
+};  
+  
+  
+//类的成员函数和类的静态成员函数  
+class CTest  
+{  
+public:  
+    int Func(int a)  
+    {  
+        return a;  
+    }  
+    static int SFunc(int a)  
+    {  
+        return a;  
+    }  
+};  
+  
+  
+int main(int argc, char* argv[])  
+{  
+    //封装普通函数  
+    Functional obj = TestFunc;  
+    int res = obj(0);  
+    cout << "normal function : " << res << endl;  
+  
+    //封装lambda表达式  
+    obj = lambda;  
+    res = obj(1);  
+    cout << "lambda expression : " << res << endl;  
+  
+    //封装仿函数  
+    Functor functorObj;  
+    obj = functorObj;  
+    res = obj(2);  
+    cout << "functor : " << res << endl;  
+  
+    //封装类的成员函数和static成员函数  
+    CTest t;  
+    obj = std::bind(&CTest::Func, &t, std::placeholders::_1);  
+    res = obj(3);  
+    cout << "member function : " << res << endl;  
+  
+    obj = CTest::SFunc;  
+    res = obj(4);  
+    cout << "static member function : " << res << endl;  
+  
+    return 0;  
+}  
+```
+
+输出结果如下：
+
+```c++
+normal function : 0
+lambda expression : 1
+functor : 2
+member function : 3
+static member function : 4
+```
+
+### 43.unordered_map取代switch_case
+
+​	switch-case 作为原生的机制，效率还是非常高的，在百个 case 这个量级下比 stl 的容器效率高很多（目前大多项目一个 case 百量级应该够用了），但 switch-case 在 case 较多的情况下，即使每个 case 只用一个函数可读性感觉还是没那么好，所以在效率没那么敏感，case 较多的情况下还是用一些结构如 map 等去整理 case 比较好。
+
+### 44.move
+
+1. C++ 标准库使用比如vector::push_back 等这类函数时,会对参数的对象进行复制,连数据也会复制.这就会造成对象内存的额外创建, 本来原意是想把参数push_back进去就行了,**通过std::move，可以避免不必要的拷贝操作**。
+
+2. std::move是将对象的状态或者所有权从一个对象转移到另一个对象，只是转移，没有内存的搬迁或者内存拷贝所以可以提高利用效率,改善性能.。
+
+3. 对指针类型的标准库对象并不需要这么做.
+
+   
+
+例子：
+
+```c++
+void TestSTLObject()
+{
+    std::string str = "Hello";
+    std::vector<std::string> v;
+ 
+    // uses the push_back(const T&) overload, which means
+    // we'll incur the cost of copying str
+    v.push_back(str);
+    std::cout << "After copy, str is \"" << str << "\"\n";
+ 
+    // uses the rvalue reference push_back(T&&) overload,
+    // which means no strings will be copied; instead, the contents
+    // of str will be moved into the vector.  This is less
+    // expensive, but also means str might now be empty.
+    v.push_back(std::move(str));
+    std::cout << "After move, str is \"" << str << "\"\n";
+ 
+    std::cout << "The contents of the vector are \"" << v[0]
+                                         << "\", \"" << v[1] << "\"\n";
+ 
+}
+```
+
+输出结果如下：
+
+```c++
+After copy, str is "Hello"
+After move, str is ""
+The contents of the vector are "Hello", "Hello"
+```
+
+可以见到，
+
+1. std::move(t) 用来表明对象t 是可以moved from的,它允许高效的从t资源转换到lvalue上.**将对象拥有的资源转移到左值上。**
+2. 注意,标准库对象支持moved from的左值在moved 之后它的对象原值是有效的(可以正常析构),但是是unspecified的,可以理解为空数据,但是这个对象的其他方法返回值不一定是0,比如size().所以,moved from 之后的对象最好还是不要使用吧?(如有不正确理解,请告知)
+3. 对本身进行move,并赋值给本身是undefined的行为.
+
+**若想要自定义的类对象支持moved from 操作**,需要实现 Move Constructors and Move Assignment Operators
+
+```C++
+
+```
+
+
+## 四. 操作系统
 
 ### 1. I/O模型
 
@@ -3086,7 +5203,7 @@ Linux 下常用的性能分析工具，能实时显示系统中进程的资源�
 
 **第七行以下：各进程（任务）的状态监控**
 
-## 六. 计算机网络
+## 五. 计算机网络
 
 ### 1. 分层模型
 
@@ -3592,13 +5709,13 @@ TCP 是一个协议，是传输层的一种运行机制，而 socket 是操作�
 
 **`STL`中的`sort()`系列算法**
 
-前提是容器的迭代器必须为随机迭代器，所以`vector`和`deque`天然适用。`STL`中的`sort`算法使用了一些策略，在不同的情况下采用不同的排序算法，以达到各种算法互补的效果。基本的原则是：数据量大的采用快速排序，数据量小的采用插入排序（这是对快排常用的一种优化策略），递归层次太深改用堆排序。
+前提是容器的迭代器必须为随机迭代器，所以`vector`和`deque`天然适用。**`STL`中的`sort`算法使用了一些策略，在不同的情况下采用不同的排序算法，**以达到各种算法互补的效果。基本的原则是：**数据量大的采用快速排序，数据量小的采用插入排序（这是对快排常用的一种优化策略），递归层次太深改用堆排序。**
 
 ### 2. map 哈希
 
 内部实现：
 
-- map 内部实现了一个**红黑树**，该结构具有根据 **自动排序**的功能，因此 map 内部的所有元素都是有序的，红黑树的每个节点都代表着 map 的一个元素，因此对于 map 进行的查找、删除和添加的时间复杂度为`O(logn)`
+- map 内部实现了一个**红黑树**，该结构具有**自动排序**的功能，因此 map 内部的所有元素都是有序的，红黑树的每个节点都代表着 map 的一个元素，因此对于 map 进行的查找、删除和添加的时间复杂度为`O(logn)`
 
   红黑树是一种特殊的二叉查找树，这里是按照 **key** 来排序。
 
@@ -3742,7 +5859,7 @@ hash 增长规律应该是每次成长到**不小于当前桶大小两倍的最�
 
 ### 8. 迭代器的作用
 
-迭代器(iterator)是一种抽象的设计理念，通过迭代器可以在不了解容器内部原理的情况下遍历容器。stack 和 queue 不支持迭代器访问。
+迭代器(iterator)是一种抽象的设计理念，**通过迭代器可以在不了解容器内部原理的情况下遍历容器**。stack 和 queue 不支持迭代器访问。
 
 除此之外，STL中迭代器一个最重要的作用就是作为容器(vector,list等)与STL算法的粘结剂，只要容器提供迭代器的接口，同一套算法代码可以利用在完全不同的容器中，这是抽象思想的经典应用。**指针与迭代器的差别：**
 
@@ -3952,7 +6069,16 @@ Server 层包括：连接器、查询缓存、分析器、优化器、执行器�
 描述
 
 - 适配器模式属于结构型模式
+
 - 原型模式属于创建型模式，实现了一个原型接口，用于创建当前对象的克隆
+
 - 桥接模式属于结构型模式，用于将抽象化与实现化解耦，使得二者可以独立变化
+
 - 策略模式属于行为型模式。意图是定义一系列算法，将其一个个封装起来，并使他们可互相替换
+
+  
+
+
+
+
 
