@@ -3330,9 +3330,71 @@ duration:228ms
 
 结果表明，采用原子变量能保证运算结果正确，且能相对于互斥变量mutex,运算速度明显提高。
 
-### 36.join()
+### 36.thread() 与 join()
 
-用于多线程环境中，保证程序后续处理能正常执行，join()会阻塞线程环境，直到线程对象执行完传入的方法，总结理解一下就是两个关键点：
+**使用std::thread**
+
+在如下的demo中，在主线程中使用`std::thread`创建3个子线程，线程入口函数是`do_some_word`，在主线程运行结束前等待[子线程](https://www.zhihu.com/search?q=子线程&search_source=Entity&hybrid_search_source=Entity&hybrid_search_extra={"sourceType"%3A"article"%2C"sourceId"%3A"354676653"})结束。
+
+```cpp
+  void do_some_work(int num) { 
+    std::cout<<"thread: "<<num<<std::endl;
+  }
+
+  int main(int argc, char const *argv[]){ 
+      int threadNums =3;
+      std::vector<std::thread> threadList;
+      threadList.reserve(threadNums);
+
+      // 1 创建 threadNums 个线程
+      for(int idx=0; idx < threadNums; ++idx) { 
+        threadList.emplace_back(std::thread{do_some_work, idx});
+      }
+
+      std::cout<<"work in main thread"<<std::endl;
+
+      // 2 终止 threadNums 个线程
+      for(int idx=0; idx < threadNums; ++idx) { 
+        threadList[idx].join();
+      }
+
+      std::cout<<"main thread end"<<std::endl;
+      return 0;
+  }
+```
+
+在demo中，在构造线程对象`std::thread{do_some_work, idx}`的时候，还是建议使用`{}`而不是`()`，以防止编译器产生错误的决议。
+
+三个子线程共享输出缓冲区`std::cout`，此时没有采取任何机制保护线程间共享数据，因此上面demo的输出可能不符合你的预期，即很可能不是按照如下格式输出：
+
+```cpp
+  thread: 1
+  thread: 2
+  thread: 3
+```
+
+实际上的输出，可能会非常混乱：
+
+```cpp
+   $ g++ -g thread_unitest.cc  -o thread -lpthread && ./thread
+    thread: thread: 12  // 两个线程的输出融合在一起了，
+
+
+    work in main thread
+    thread: 0              // 最先启动的线程，却最后输出
+    main thread end    // 子线程都已中止
+```
+
+从输出可以看出：
+
+- **先创建的线程，未必就先运行；**
+- **而且几个线程之间是互相抢档CPU资源的。**
+
+线程间数据共享问题及其应对措施，留到后文讲解，下面讲解`std::thread`的设计。
+
+## 
+
+join()用于多线程环境中，保证程序后续处理能正常执行，join()会阻塞线程环境，直到线程对象执行完传入的方法，总结理解一下就是两个关键点：
 
 - **谁调用了这个函数？**调用了这个函数的线程对象，一定要等这个线程对象的方法（在构造时传入的方法）执行完毕后（或者理解为这个线程的活干完了！），这个join()函数才能得到返回。
 - **在什么线程环境下调用了这个函数？**上面说了必须要等线程方法执行完毕后才能返回，那必然是阻塞调用线程的，也就是说如果一个线程对象在一个线程环境调用了这个函数，那么这个线程环境就会被阻塞，直到这个线程对象在构造时传入的**方法**执行完毕后，才能继续往下走，另外如果线程对象在调用join()函数之前，就已经做完了自己的事情（在构造时传入的方法执行完毕），那么这个函数不会阻塞线程环境，线程环境正常执行。
@@ -4294,6 +4356,704 @@ for (int i = 1; i <= 1000; ++i) v.push_back(i);
 这在循环中不会发生重新分配。
 
 
+
+### 45.C++多线程并发
+
+#### **1 什么是C++多线程并发？**
+
+线程：**线程是操作系统能够进行CPU调度的最小单位**，它被包含在进程之中，一个进程可包含单个或者多个线程。可以用多个线程去完成一个任务，也可以用多个进程去完成一个任务，它们的本质都相当于多个人去合伙完成一件事。
+
+多线程并发：多线程是实现并发(双核的真正并行或者单核机器的任务切换都叫并发）的一种手段，多线程并发即多个线程同时执行,一般而言，多线程并发就是把一个任务拆分为多个子任务，然后交由不同线程处理不同子任务,使得这多个子任务同时执行。
+
+C++多线程并发： （简单情况下）实现C++多线程并发程序的思路如下：**将任务的不同功能交由多个函数分别实现，创建多个线程，每个线程执行一个函数，一个任务就这样同时分由不同线程执行了。**
+
+**不要过多纠结多线程与多进程、并发与并行这些概念** （这些概念都是相当于多个人去合伙完成一件事），会用才是王道，理解大致意思即可,想要深入了解可阅读本文“延伸拓展”章节。
+
+**我们通常在何时使用并发?** 程序使用并发的原因有两种，为了关注点分离（程序中不同的功能，使用不同的线程去执行），或者为了提高性能。当为了分离关注点而使用多线程时，设计线程的数量的依据，不再是依赖于CPU中的可用内核的数量，而是依据概念上的设计（依据功能的划分）。
+
+**知道何时不使用并发与知道何时使用它一样重要。** 不使用并发的唯一原因就是收益（性能的增幅）比不上成本（代码开发的脑力成本、时间成本，代码维护相关的额外成本）。运行越多的线程，操作系统需要为每个线程分配独立的栈空间，需要越多的上下文切换，这会消耗很多操作系统资源，如果在线程上的任务完成得很快，**那么实际执行任务的时间要比启动线程的时间小很多，所以在某些时候，增加一个额外的线程实际上会降低，而非提高应用程序的整体性能，此时收益就比不上成本。**
+
+#### **2 C++多线程并发基础知识**
+
+**2.1 创建线程**
+
+首先要引入头文件`#include<thread>`，管理线程的函数和类在该头文件中声明，其中包括std::thread类。
+
+语句"std::thread th1(proc1);"创建了一个名为th1的线程，并且线程th1开始执行。
+
+实例化std::thread类对象时，至少需要传递函数名作为参数。如果函数为有参函数,如"void proc2(int a,int b)",那么实例化std::thread类对象时，则需要传递更多参数，参数顺序依次为函数名、该函数的第一个参数、该函数的第二个参数，···，如"std::thread th2(proc2,a,b);"。这里的传参，后续章节还会有详解与提升。
+
+**只要创建了线程对象**（前提是，实例化std::thread对象时传递了“函数名/可调用对象”作为参数），**线程就开始执行。所以不应该在创建了线程后马上join, 这样会马上阻塞主线程，创建了线程和没有创建一样，应该在晚一点的位置调用join**
+
+**总之，使用C++线程库启动线程，可以归结为构造std::thread对象。**
+
+**那么至此一个简单的多线程并发程序就编写完了吗？**
+
+不，还没有。**当线程启动后，一定要在和线程相关联的std::thread对象销毁前，对线程运用join()或者detach()方法。**
+
+join()与detach()都是std::thread类的成员函数，是两种线程阻塞方法，两者的区别是是否等待[子线程](https://www.zhihu.com/search?q=子线程&search_source=Entity&hybrid_search_source=Entity&hybrid_search_extra={"sourceType"%3A"article"%2C"sourceId"%3A"194198073"})执行结束。
+
+新手先把join()弄明白就行了，然后就可以去学习后面的章节，等过段时间再回头来学detach()。
+
+等待调用线程运行结束后当前线程再继续运行，**例如，主函数中有一条语句th1.join(),那么执行到这里，主函数阻塞，直到线程th1运行结束，主函数再继续运行**。
+
+整个过程就相当于：你在处理某件事情（你是主线程），中途你让老王帮你办一个任务（与你同时执行）（创建线程1，该线程取名老王），又叫老李帮你办一件任务（创建线程2，该线程取名老李），现在你的一部分工作做完了，剩下的工作得用到他们的处理结果，那就调用"老王.join()"与"老李.join()"，至此你就需要等待（主线程阻塞），等他们把任务做完（子线程运行结束），你就可以继续你手头的工作了（主线程不再阻塞）。
+
+一提到join,你脑海中就想起两个字，"等待"，而不是"加入"，这样就很容易理解join的功能。
+
+```c++
+#include<iostream>
+#include<thread>
+using namespace std;
+void proc(int &a)
+{
+    cout << "我是子线程,传入参数为" << a << endl;
+    cout << "子线程中显示子线程id为" << this_thread::get_id()<< endl;
+}
+int main()
+{
+    cout << "我是主线程" << endl;
+    int a = 9;
+    thread th2(proc,ref(a));//第一个参数为函数名，第二个参数为该函数的第一个参数，如果该函数接收多个参数就依次写在后面。此时线程开始执行。
+    cout << "主线程中显示子线程id为" << th2.get_id() << endl;
+    //此处省略多行，不要在创建完线程后马上join,应该在程序结束前join
+    th2.join()；//此时主线程被阻塞直至子线程执行结束。
+    return 0;
+}
+```
+
+调用join()会清理线程相关的存储部分，这代表了join()只能调用一次。使用joinable()来判断join()可否调用。同样，detach()也只能调用一次，一旦detach()后就无法join()了，有趣的是，detach()可否调用也是使用joinable()来判断。
+
+如果使用detach()，就必须保证线程结束之前可访问数据的有效性，使用指针和引用需要格外谨慎，这点我们放到以后再聊。
+
+#### **2.2 互斥量（锁）使用**
+
+**什么是互斥量（锁）？**
+
+这样比喻：单位上有一台打印机（共享数据a），你要用打印机（线程1要操作数据a），同事老王也要用打印机(线程2也要操作数据a)，但是打印机同一时间只能给一个人用，此时，规定不管是谁，在用打印机之前都要向领导申请许可证（lock），用完后再向领导归还许可证(unlock)，许可证总共只有一个,没有许可证的人就等着在用打印机的同事用完后才能申请许可证(阻塞，线程1lock互斥量后其他线程就无法lock,只能等线程1unlock后，其他线程才能lock)。**那么，打印机就是共享数据，访问打印机的这段代码就是临界区，这个必须互斥使用的许可证就是互斥量（锁）**。
+
+互斥量是为了解决数据共享过程中可能存在的访问冲突的问题。这里的互斥量保证了使用打印机这一过程不被打断。
+
+#### 死锁
+
+多线程编程时要考虑多个线程同时访问共享资源所造成的问题，因此可以通过加锁解锁来保证同一时刻只有一个线程能访问共享资源；使用锁的时候要注意，不能出现死锁的状况；
+
+**死锁**就是多个线程争夺共享资源导致每个线程都不能取得自己所需的全部资源，从而程序无法向下执行。
+
+**产生死锁的四个必要条件（面试考点）：**
+
+1. 互斥（资源同一时刻只能被一个进程使用）
+2. 请求并保持（进程在请求资源时，不释放自己已经占有的资源）
+3. 不剥夺（进程已经获得的资源，在进程使用完前，不能强制剥夺）
+4. 循环等待（进程间形成环状的资源循环等待关系）
+
+
+
+**死锁预防：**
+
+破坏死锁产生的四个条件（完全杜绝死锁）
+
+**死锁避免：**
+
+对分配资源做安全性检查，确保不会产生循环等待（银行家算法）
+
+**死锁检测：**
+
+允许死锁的发生，但提供检测方法
+
+**死锁解除：**
+
+已经产生了死锁，强制剥夺资源或者撤销进程
+
+
+
+**[临界区](https://www.zhihu.com/search?q=临界区&search_source=Entity&hybrid_search_source=Entity&hybrid_search_extra={"sourceType"%3A"article"%2C"sourceId"%3A"194198073"})、信号量、互斥量（锁）的区别与联系：**
+
+三者都可用来进行进程的同步与互斥；
+
+**临界区**速度最快，但只能作用于同一进程下不同线程，不能作用于不同进程；临界区可确保某一代码段同一时刻只被一个线程执行；
+
+EnterCriticalSection（） 进入临界区
+
+LeaveCriticalSection（） 离开临界区
+
+**信号量**多个线程同一时刻访问共享资源，进行线程的计数，确保同时访问资源的线程数目不超过上限，当访问数超过上限后，不发出信号量；
+
+P操作 申请资源
+
+V操作 释放资源
+
+**互斥量**（锁）比临界区满，但支持不同进程间的同步与互斥；
+
+
+
+**同步与互斥**
+
+任务运行时，有些任务片段间存在严格的先后顺序，**同步指维护任务片段的先后顺序;**
+
+直观的表现就是若A片段执行完才能执行B片段，线程1执行A片段，线程2执行B片段，在B片段执行前申请锁l，在A片段执行结束后解锁l；未申请到锁l即A片段还未执行完，线程1等待线程2执行。**A片段解锁了B片段才能申请到锁，保证了A片段执行结束了B片段才能运行，称之为同步；**
+
+**互斥就是保证资源同一时刻只能被一个进程使用；**互斥是为了保证数据的一致性，如果A线程在执行计算式A的时候，某个量被B线程改掉了，这可能会出现问题，于是要求资源互斥，我在用它你就不能用，等我用完了你再用，我们彼此互不干扰。
+
+
+
+**互斥锁**
+
+互斥量mutex就是互斥锁，加锁的资源支持互斥访问；
+
+
+
+**读写锁**
+
+**shared_mutex**读写锁把对共享资源的访问者划分成读者和写者，多个读线程能同时读取共享资源，但只有一个写线程能同时读取共享资源
+
+对分配资源做安全性检查，确保不会产生循环等待（银行家算法）shared_mutex通过lock_shared，unlock_shared进行读者的锁定与解锁；通过lock，unlock进行写者的锁定与解锁。
+
+```cpp
+shared_mutex s_m;
+
+std::string book;
+
+void read()
+{
+	s_m.lock_shared();
+	cout << book;
+	s_m.unlock_shared();
+}
+
+void write()
+{
+	s_m.lock();
+	book = "new context";
+	s_m.unlock();
+}
+```
+
+**自旋锁**
+
+如果自旋锁已经被别的执行单元保持，调用者就一直循环在那里看是否该自旋锁的保持者已经释放了锁；
+
+自旋锁比较适用于锁使用者保持锁时间比较短的情况。
+
+
+
+**互斥量（锁）怎么使用？**
+
+首先需要`#include<mutex>`；（std::mutex和std::lock_guard都在`<mutex>`头文件中声明。）
+
+然后需要实例化std::mutex对象；
+
+需要在进入临界区之前对互斥量加锁，退出临界区时对互斥量解锁；
+
+**lock()与unlock():**
+
+```c++
+#include<iostream>
+#include<thread>
+#include<mutex>
+using namespace std;
+mutex m;//实例化m对象，不要理解为定义变量
+void proc1(int a)
+{
+    m.lock();
+    cout << "proc1函数正在改写a" << endl;
+    cout << "原始a为" << a << endl;
+    cout << "现在a为" << a + 2 << endl;
+    m.unlock();
+}
+
+void proc2(int a)
+{
+    m.lock();
+    cout << "proc2函数正在改写a" << endl;
+    cout << "原始a为" << a << endl;
+    cout << "现在a为" << a + 1 << endl;
+    m.unlock();
+}
+int main()
+{
+    int a = 0;
+    thread t1(proc1, a);
+    thread t2(proc2, a);
+    t1.join();
+    t2.join();
+    return 0;
+}
+```
+
+需要在进入临界区之前对互斥量加锁lock，退出临界区时对互斥量解锁unlock；当一个线程使用特定互斥量锁住共享数据时，其他的线程想要访问锁住的数据，都必须等到之前那个线程对数据进行解锁后，才能进行访问。
+
+程序实例化mutex对象m,本线程调用成员函数m.lock()会发生下面 2 种情况： (1)如果该互斥量当前未上锁，则本线程将该互斥量锁住，直到调用unlock()之前，本线程一直拥有该锁。 (2)如果该互斥量当前被其他线程锁住，则本线程被阻塞,直至该互斥量被其他线程解锁，此时本线程将该互斥量锁住，直到调用unlock()之前，本线程一直拥有该锁。
+
+不推荐直接去调用成员函数lock()，因为如果忘记unlock()，将导致锁无法释放，**使用lock_guard或者unique_lock则能避免忘记解锁带来的问题。**
+
+#### **lock_guard:**
+
+std::lock_guard()是什么呢？它就像一个保姆，职责就是帮你管理互斥量，就好像小孩要玩玩具时候，保姆就帮忙把玩具找出来，孩子不玩了，保姆就把玩具收纳好。
+
+其原理是：声明一个局部的std::lock_guard对象，在其构造函数中进行加锁，在其析构函数中进行解锁。最终的结果就是：创建即加锁，作用域结束自动解锁。从而使用std::lock_guard()就可以替代lock()与unlock()。 
+
+**通过设定作用域，使得std::lock_guard在合适的地方被析构**（在互斥量锁定到互斥量解锁之间的代码叫做临界区（需要互斥访问共享资源的那段代码称为临界区），临界区范围应该尽可能的小，即lock互斥量后应该尽早unlock），**通过使用{}来调整作用域范围，可使得互斥量m在合适的地方被解锁**：
+
+```c++
+#include<iostream>
+#include<thread>
+#include<mutex>
+using namespace std;
+mutex m;//实例化m对象，不要理解为定义变量
+void proc1(int a)
+{
+    lock_guard<mutex> g1(m);//用此语句替换了m.lock()；lock_guard传入一个参数时，该参数为互斥量，此时调用了lock_guard的构造函数，申请锁定m
+    cout << "proc1函数正在改写a" << endl;
+    cout << "原始a为" << a << endl;
+    cout << "现在a为" << a + 2 << endl;
+}//此时不需要写m.unlock(),g1出了作用域被释放，自动调用析构函数，于是m被解锁
+
+void proc2(int a)
+{
+    {
+        lock_guard<mutex> g2(m);
+        cout << "proc2函数正在改写a" << endl;
+        cout << "原始a为" << a << endl;
+        cout << "现在a为" << a + 1 << endl;
+    }//通过使用{}来调整作用域范围，可使得m在合适的地方被解锁
+    cout << "作用域外的内容3" << endl;
+    cout << "作用域外的内容4" << endl;
+    cout << "作用域外的内容5" << endl;
+}
+int main()
+{
+    int a = 0;
+    thread t1(proc1, a);
+    thread t2(proc2, a);
+    t1.join();
+    t2.join();
+    return 0;
+}
+```
+
+std::lock_gurad也可以传入两个参数，第一个参数为adopt_lock标识时，表示构造函数中不再进行互斥量锁定，因此**此时需要提前手动锁定**。
+
+```c++
+#include<iostream>
+#include<thread>
+#include<mutex>
+using namespace std;
+mutex m;//实例化m对象，不要理解为定义变量
+void proc1(int a)
+{
+    m.lock();//手动锁定
+    lock_guard<mutex> g1(m,adopt_lock);
+    cout << "proc1函数正在改写a" << endl;
+    cout << "原始a为" << a << endl;
+    cout << "现在a为" << a + 2 << endl;
+}//自动解锁
+
+void proc2(int a)
+{
+    lock_guard<mutex> g2(m);//自动锁定
+    cout << "proc2函数正在改写a" << endl;
+    cout << "原始a为" << a << endl;
+    cout << "现在a为" << a + 1 << endl;
+}//自动解锁
+int main()
+{
+    int a = 0;
+    thread t1(proc1, a);
+    thread t2(proc2, a);
+    t1.join();
+    t2.join();
+    return 0;
+}
+```
+
+#### **unique_lock:**
+
+std::unique_lock类似于lock_guard,只是std::unique_lock用法更加丰富，同时支持std::lock_guard()的原有功能。 使用std::lock_[guard](https://www.zhihu.com/search?q=guard&search_source=Entity&hybrid_search_source=Entity&hybrid_search_extra={"sourceType"%3A"article"%2C"sourceId"%3A"194198073"})后不能手动lock()与手动unlock();使用std::unique_lock后可以手动lock()与手动unlock(); std::unique_lock的第二个参数，除了可以是adopt_lock,还可以是try_to_lock与defer_lock;
+
+try_to_lock: 尝试去锁定，**得保证锁处于unlock的状态**,然后尝试现在能不能获得锁；尝试用mutx的lock()去锁定这个mutex，但如果没有锁定成功，会立即返回，不会阻塞在那里，并继续往下执行；
+
+defer_lock: 始化了一个没有加锁的mutex;
+
+![img](https://raw.githubusercontent.com/Howardcl/MyImage/main/img/v2-b360bb0884ac5b575268c8d8d56a0818_b.jpg)
+
+```c++
+#include<iostream>
+#include<thread>
+#include<mutex>
+using namespace std;
+mutex m;
+void proc1(int a)
+{
+	unique_lock<mutex> g1(m, defer_lock);//始化了一个没有加锁的mutex
+	cout << "xxxxxxxx" << endl;
+	g1.lock();//手动加锁，注意，不是m.lock();注意，不是m.lock(),m已经被g1接管了;
+	cout << "proc1函数正在改写a" << endl;
+	cout << "原始a为" << a << endl;
+	cout << "现在a为" << a + 2 << endl;
+	g1.unlock();//临时解锁
+	cout << "xxxxx" << endl;
+	g1.lock();
+	cout << "xxxxxx" << endl;
+}//自动解锁
+
+void proc2(int a)
+{
+	unique_lock<mutex> g2(m, try_to_lock);//尝试加锁一次，但如果没有锁定成功，会立即返回，不会阻塞在那里，且不会再次尝试锁操作。
+	if (g2.owns_lock()) {//锁成功
+		cout << "proc2函数正在改写a" << endl;
+		cout << "原始a为" << a << endl;
+		cout << "现在a为" << a + 1 << endl;
+	}
+	else {//锁失败则执行这段语句
+		cout << "" << endl;
+	}
+}//自动解锁
+
+int main()
+{
+	int a = 0;
+	thread t1(proc1, a);
+	t1.join();
+	//thread t2(proc2, a);
+	//t2.join();
+	return 0;
+}
+```
+
+使用try_to_lock要小心，因为try_to_lock尝试锁失败后不会阻塞线程，而是继续往下执行程序，因此，需要使用if-else语句来判断是否锁成功,只有锁成功后才能去执行互斥代码段。而且需要注意的是，因为try_to_lock尝试锁失败后代码继续往下执行了，因此该语句不会再次去尝试锁。
+
+std::unique_lock所有权的转移
+
+注意，这里的转移指的是**std::unique_\*lock对象间\****的转移；std::mutex对象的所有权不需要手动转移给std::unique_lock , std::unique_lock对象实例化后会直接接管std::mutex。*
+
+```text
+mutex m;
+{  
+    unique_lock<mutex> g2(m,defer_lock);
+    unique_lock<mutex> g3(move(g2));//所有权转移，此时由g3来管理互斥量m
+    g3.lock();
+    g3.unlock();
+    g3.lock();
+}
+```
+
+#### **condition_variable:**
+
+需要#include<condition_variable>，该头文件中包含了条件变量相关的类，其中包括std::condition_variable类
+
+如何使用？std::condition_variable类搭配std::mutex类来使用，std::condition_variable对象(std::condition_variable cond;)的作用不是用来管理互斥量的，它的作用是用来同步线程，它的用法相当于编程中常见的flag标志（A、B两个人约定flag=true为行动号角，默认flag为false,A不断的检查flag的值,只要B将flag修改为true，A就开始行动）。
+
+类比到std::condition_variable，A、B两个人约定notify_one为行动号角，A就等着（调用wait(),阻塞）,只要B一调用notify_one，A就开始行动（不再阻塞）。
+
+std::condition_variable的具体使用代码实例可以参见文章中“生产者与消费者问题”章节。
+
+wait(locker) :
+
+wait函数需要传入一个std::mutex（一般会传入std::unique_lock对象）,即上述的locker。wait函数会自动调用 locker.unlock() 释放锁（因为需要释放锁，所以要传入mutex）并阻塞当前线程，本线程释放锁使得其他的线程得以继续竞争锁。一旦当前线程获得notify(通常是另外某个线程调用 notify_* 唤醒了当前线程)，wait() 函数此时再自动调用 locker.lock()上锁。
+
+cond.notify_one(): 随机唤醒一个等待的线程
+
+cond.notify_all(): 唤醒所有等待的线程
+
+------
+
+#### 2.3 异步线程
+
+需要#include<future>
+
+#### **async与future：**
+
+std::async是一个函数模板，用来启动一个异步任务，它返回一个std::future类模板对象，future对象起到了**占位**的作用（记住这点就可以了），占位是什么意思？就是说该变量现在无值，但将来会有值（好比你挤公交瞧见空了个座位，刚准备坐下去就被旁边的小伙给拦住了：“这个座位有人了”，你反驳道：”这不是空着吗？“，小伙：”等会人就来了“）,刚实例化的future是没有储存值的，但在调用std::future对象的get()成员函数时，主线程会被阻塞直到异步线程执行结束，并把返回结果传递给std::future，即通过FutureObject.get()获取函数返回值。
+
+相当于你去办政府办业务（主线程），把资料交给了前台，前台安排了人员去给你办理（std::async创建子线程），前台给了你一个单据（std::future对象），说你的业务正在给你办（子线程正在运行），等段时间你再过来凭这个单据取结果。过了段时间，你去前台取结果（调用get()），但是结果还没出来（子线程还没return），你就在前台等着（阻塞），直到你拿到结果（子线程return），你才离开（不再阻塞）。
+
+```c++
+#include <iostream>
+#include <thread>
+#include <mutex>
+#include<future>
+#include<Windows.h>
+using namespace std;
+double t1(const double a, const double b)
+{
+ double c = a + b;
+ Sleep(3000);//假设t1函数是个复杂的计算过程，需要消耗3秒
+ return c;
+}
+
+int main() 
+{
+ double a = 2.3;
+ double b = 6.7;
+ future<double> fu = async(t1, a, b);//创建异步线程线程，并将线程的执行结果用fu占位；
+ cout << "正在进行计算" << endl;
+ cout << "计算结果马上就准备好，请您耐心等待" << endl;
+ cout << "计算结果：" << fu.get() << endl;//阻塞主线程，直至异步线程return
+        //cout << "计算结果：" << fu.get() << endl;//取消该语句注释后运行会报错，因为future对象的get()方法只能调用一次。
+ return 0;
+}
+```
+
+#### **shared_future**
+
+std::future与std::shard_future的用途都是为了**占位**，但是两者有些许差别。std::future的get()成员函数是转移数据所有权;std::shared_future的get()成员函数是复制数据。 因此： **future对象的get()只能调用一次**；无法实现多个线程等待同一个异步线程，一旦其中一个线程获取了异步线程的返回值，其他线程就无法再次获取。 **std::shared_future对象的get()可以调用多次**；可以实现多个线程等待同一个异步线程，每个线程都可以获取异步线程的返回值。
+
+![img](https://raw.githubusercontent.com/Howardcl/MyImage/main/img/v2-317eec879566d2da658673e11f81f00d_b.jpg)
+
+#### **2.4 原子类型atomic<>**
+
+原子操作指“不可分割的操作”，也就是说这种操作状态要么是完成的，要么是没完成的，不存在“操作完成了一半”这种状况。互斥量的加锁一般是针对一个代码段，而原子操作针对的一般都是一个变量(操作变量时加锁防止他人干扰)。 std::atomic<>是一个模板类，使用该模板类实例化的对象，提供了一些保证原子性的成员函数来实现共享数据的常用操作。
+
+可以这样理解： 在以前，定义了一个共享的变量(int i=0)，多个线程会用到这个变量，那么每次操作这个变量时，都需要lock加锁，操作完毕unlock解锁，以保证线程之间不会冲突；但是这样每次加锁解锁、加锁解锁就显得很麻烦，那怎么办呢？ 现在，实例化了一个类对象(std::atomic<int> I=0)来代替以前的那个变量（这里的对象I你就把它看作一个变量，看作对象反而难以理解了），每次操作这个对象时，就不用lock与unlock，这个对象自身就具有原子性（相当于加锁解锁操作不用你写代码实现，能自动加锁解锁了），以保证线程之间不会冲突。
+
+提到std::atomic<>，你脑海里就想到一点就可以了：std::atomic<>用来定义一个自动加锁解锁的共享变量（“定义”“变量”用词在这里是不准确的，但是更加贴切它的实际功能），供多个线程访问而不发生冲突。
+
+```c++
+//原子类型的简单使用
+std::atomic<bool> b(true);
+b=false;
+```
+
+std::atomic<>对象提供了常见的原子操作（通过调用成员函数实现对数据的原子操作）： store是原子写操作，load是原子读操作。exchange是于两个数值进行交换的原子操作。 **即使使用了std::atomic<>，也要注意执行的操作是否支持原子性**，也就是说，你不要觉得用的是具有原子性的变量（准确说是对象）就可以为所欲为了，你对它进行的运算不支持原子性的话，也不能实现其原子效果。一般针对++，–，+=，-=，&=，|=，^=是支持的，这些原子操作是通过在std::atomic<>对象内部进行运算符重载实现的。
+
+#### **3 代码实例**
+
+前一章内容为了简单的说明一些函数的用法，所列举的例子有些牵强，因此在本章列举了一些多线程常见的实例
+
+#### **3.1 生产者消费者问题**
+
+生产者-消费者模型是经典的多线程并发协作模型。
+
+生产者用于生产数据，生产一个就往共享数据区存一个，如果共享数据区已满的话，生产者就暂停生产，等待消费者的通知后再启动。
+
+消费者用于消费数据，一个一个的从共享数据区取，如果共享数据区为空的话，消费者就暂停取数据，等待生产者的通知后再启动。
+
+生产者与消费者不能直接交互,它们之间所共享的数据使用队列结构来实现;
+
+如下代码着重强调的是简单易懂：
+
+```cpp
+#include<iostream>
+#include<thread>
+#include<mutex>
+#include<queue>
+#include<condition_variable>
+
+
+using namespace std;
+
+//缓冲区存储的数据类型 
+struct CacheData
+{
+	//商品id 
+	int id;
+	//商品属性 
+	string data;
+};
+
+queue<CacheData> Q;
+//缓冲区最大空间 
+const int MAX_CACHEDATA_LENGTH = 10;
+//互斥量，生产者之间，消费者之间，生产者和消费者之间，同时都只能一个线程访问缓冲区 
+mutex m;
+condition_variable condConsumer;
+condition_variable condProducer;
+//全局商品id 
+int ID = 1;
+
+//消费者动作 
+void ConsumerActor()
+{
+	unique_lock<mutex> lockerConsumer(m);
+	cout << "[" << this_thread::get_id() << "] 获取了锁" << endl; 
+	while (Q.empty())
+	{
+		cout <<  "因为队列为空，所以消费者Sleep" << endl; 
+		cout << "[" << this_thread::get_id() << "] 不再持有锁" << endl;
+		//队列空， 消费者停止，等待生产者唤醒 
+		condConsumer.wait(lockerConsumer);
+		cout << "[" << this_thread::get_id() << "] Weak, 重新获取了锁" << endl; 
+	}
+	cout << "[" << this_thread::get_id() << "] "; 
+	CacheData temp = Q.front();
+	cout << "- ID:" << temp.id << " Data:" << temp.data << endl;
+	Q.pop(); 
+	condProducer.notify_one();
+	cout << "[" << this_thread::get_id() << "] 释放了锁" << endl; 
+}
+
+//生产者动作 
+void ProducerActor()
+{
+	unique_lock<mutex> lockerProducer(m);
+	cout << "[" << this_thread::get_id() << "] 获取了锁" << endl; 
+	while (Q.size() > MAX_CACHEDATA_LENGTH)
+	{
+		cout <<  "因为队列为满，所以生产者Sleep" << endl; 
+		cout << "[" << this_thread::get_id() << "] 不再持有锁" << endl; 
+		//对列慢，生产者停止，等待消费者唤醒 
+		condProducer.wait(lockerProducer);
+		cout << "[" << this_thread::get_id() << "] Weak, 重新获取了锁" << endl; 
+	}
+	cout << "[" << this_thread::get_id() << "] "; 
+	CacheData temp;
+	temp.id = ID++;
+	temp.data = "*****";
+	cout << "+ ID:" << temp.id << " Data:" << temp.data << endl; 
+	Q.push(temp);
+	condConsumer.notify_one();
+	cout << "[" << this_thread::get_id() << "] 释放了锁" << endl; 
+}
+
+//消费者 
+void ConsumerTask()
+{
+	while(1)
+	{
+		ConsumerActor();
+	}	
+}
+
+//生产者 
+void ProducerTask()
+{
+	while(1)
+	{
+		ProducerActor();
+	}	
+}
+
+//管理线程的函数 
+void Dispatch(int ConsumerNum, int ProducerNum)
+{
+	vector<thread> thsC;
+	for (int i = 0; i < ConsumerNum; ++i)
+	{
+		thsC.push_back(thread(ConsumerTask));
+	}
+	
+	vector<thread> thsP;
+	for (int j = 0; j < ProducerNum; ++j)
+	{
+		thsP.push_back(thread(ProducerTask));
+	}
+	
+	for (int i = 0; i < ConsumerNum; ++i)
+	{
+		if (thsC[i].joinable())
+		{
+			thsC[i].join();
+		}
+	}
+	
+	for (int j = 0; j < ProducerNum; ++j)
+	{
+		if (thsP[j].joinable())
+		{
+			thsP[j].join();
+		}
+	}
+}
+
+int main()
+{
+	//一个消费者线程，5个生产者线程，则生产者经常要等待消费者 
+	Dispatch(1,5);
+	return 0; 
+}
+```
+
+#### **4 C++多线程并发高级知识**
+
+#### **4.1 线程池**
+
+#### **4.1.1 线程池基础知识**
+
+**不采用线程池时：**
+
+创建线程 -> 由该线程执行任务 -> 任务执行完毕后销毁线程。即使需要使用到大量线程，每个线程都要按照这个流程来创建、执行与销毁。
+
+虽然创建与销毁线程消耗的时间 远小于 线程执行的时间，但是对于需要频繁创建大量线程的任务，创建与销毁线程 所占用的**时间与CPU资源**也会有很大占比。
+
+**为了减少创建与销毁线程所带来的时间消耗与资源消耗，因此采用线程池的策略：**
+
+程序启动后，预先创建一定数量的线程放入空闲队列中，这些线程都是处于阻塞状态，基本不消耗CPU，只占用较小的内存空间。
+
+接收到任务后，任务被挂在任务队列，线程池选择一个空闲线程来执行此任务。
+
+任务执行完毕后，不销毁线程，线程继续保持在池中等待下一次的任务。
+
+**线程池所解决的问题：**
+
+(1) 需要频繁创建与销毁大量线程的情况下，由于线程预先就创建好了，接到任务就能马上从线程池中调用线程来处理任务，**减少了创建与销毁线程带来的时间开销和CPU资源占用**。
+
+(2) 需要并发的任务很多时候，无法为每个任务指定一个线程（线程不够分），使用线程池可以将提交的任务挂在任务队列上，等到池中有空闲线程时就可以为该任务指定线程。
+
+#### **4.1.2 线程池的实现**
+
+可以通过阅读 《C++ Concurrency in Action, Second Edition》 9.1章节来学习。线程池确实是难点部分，所以先拖着不更。
+
+#### **5 延伸拓展**
+
+#### **5.1 线程与进程/并发与并行**
+
+为了更加准确、专业的表述这两者的联系与区别，这里借用了C++标准委员会成员Anthony Willianms在书籍《C++ Concurrency in Action, Second Edition》中的表述（强推这本书，写的真的很好）：
+
+**并发的两种方式：** 双核及其的真正并行、单核机器的任务切换
+
+**并发的两种基本途径：** 多进程并发、多线程并发
+
+**多进程并发：** 优点是更容易编写安全的并发代码（操作系统为进程通信提供了一定的保护措施）、可分布式（可以通过远程连接的方式在不同的计算机上独立运行进程）；缺点是进程开销大、启动慢，进程之前的通信复杂耗时。
+
+**多线程并发：** 优点是共享内存的灵活性（进程中的所有线程共享内存地址空间。虽然进程之前也共享内存，但这种共享通常是难以管理的，因为同一数据的内存地址在不同的进程中是不同的），缺点是编写代码时工作量大（需要保证多个线程访问到的共享数据是一致的）
+
+结论是，多个进程（每个进程只包含单一线程）比多个线程（单一进程包含的多个线程）的开销大，若不考虑共享内存所带来的问题，多线程将会成为主流语言更加青睐的并发途径。
+
+**并发与并行：** 对于多线程来说，两者概念大部分重叠，意思近乎相同，只是侧重点不同，关注于使用当前可用硬件来提高批量数据处理的速度时，我们讨论程序的并行性，关注于任务分离或任务响应时，就会讨论到程序的并发性。（我的理解：并发概念中涵盖了并行）
+
+#### **5.2 创建线程时的传参问题分析**
+
+如“std::thread th1(proc1)”,创建线程时需要传递函数名作为参数，提供的函数对象会复制到新的线程的内存空间中执行与调用。
+
+如果用于创建线程的函数为含参函数，那么在创建线程时，要一并将函数的参数传入。常见的，传入的参数的形式有基本数据类型(int，char,string等)、引用、指针、对象这些，下面总结了传递不同形式的参数时std::thread类的处理机制，以及编写程序时候的注意事项。本章节只给出了部分示例代码，没有必要为了证明处理机制而举例大量简单代码而使得文章冗长，但是推荐新手自行编写程序研究。
+
+总体来说，**std::thread的构造函数会拷贝传入的参数:**
+
+1. 当传入参数为**基本数据类型(int，char,string等)**时，**会拷贝**一份给创建的线程；
+
+\2. 当传入参数为**指针**时，**会浅拷贝**一份给创建的线程，也就是说，只会拷贝对象的指针，不会拷贝指针指向的对象本身。
+
+\3. 当传入的参数为**引用**时，实参必须**用ref()函数处理**后传递给形参，否则编译不通过，**此时不存在“拷贝”行为**。引用只是变量的别名，在线程中传递对象的引用，那么该对象始终只有一份，只是存在多个别名罢了（注意把引用与指针区别开：指针是一块内存指向另一块内存，指针侧重“指向”二字；引用是只有一块内存，存在多个别名。理解引用时不要想着别名“指向”内存，这是错误的理解，这样的理解会导致分不清指针和引用，别名与其本体侧重于“一体”二字，引用就是本体，本体就是引用，根本没有“指向”关系。）；
+
+```c++
+#include<thread>
+#include<iostream>
+using namespace std;
+void proc(int& x)
+{
+	cout << x <<","<<&x<<endl;
+}
+
+int main()
+{
+	int a=10;
+	cout<< a <<",,"<<&a<<endl;
+	thread t1(proc,ref(a));
+	t1.join();
+	return 0;
+} 
+```
+
+4. 对象**时，**会拷贝**一份给创建的线程。此时会调用类对象的拷贝构造函数。
+
+#### 5.3 detach()
+
+使用detach()时，可能存在**主线程比子线程先结束**的情况，主线程结束后会释放掉自身的内存空间；在创建线程时，如果std::thread类传入的参数含有**引用或指针**，则子线程中的数据依赖于主线程中的内存，主线程结束后会释放掉自身的内存空间，则子线程会出现错误。
+
+
+
+
 ## 四. 操作系统
 
 ### 1. I/O模型
@@ -4382,6 +5142,52 @@ for (int i = 1; i <= 1000; ++i) v.push_back(i);
 多进程更加的健壮，多线程的话，只要其中一个线程挂掉了，整个进程就挂了。
 
 每个线程私有的资源有：（1）线程ID（2）寄存器组的值（3）线程的栈（4）错误返回码errno值（5）线程的信号屏蔽码（6）线程的优先级（密集型计算，拿到更多的CPU）
+
+
+
+**3.进程的通信方式是什么？**
+
+进程之间的通信方式一般有管道、FIFO、消息队列、信号量和共享内存五种。
+
+管道指的是无名管道，是UNIX 系统IPC最古老的形式。其特点如下：
+
+（1）它是半双工的（即数据只能在一个方向上流动），具有固定的读端和写端。
+
+（2）它只能用于具有亲缘关系的进程之间的通信（也是父子进程或者兄弟进程之间）。
+
+（3）它可以看成是一种特殊的文件，对于它的读写也可以使用普通的read、write 等函数。但是它不是普通的文件，并不属于其他任何文件系统，并且只存在于内存中。
+
+FIFO是命名管道，是一种文件类型。其特点如下：
+
+（1）FIFO可以在无关的进程之间交换数据，与无名管道不同。
+
+（2）FIFO有路径名与之相关联，它以一种特殊设备文件形式存在于文件系统中。
+
+消息队列是消息的链接表，存放在内核中。一个消息队列由一个标识符（即队列ID）来标识。其特点如下：
+
+（1）消息队列是面向记录的，其中的消息具有特定的格式以及特定的优先级。
+
+（2）消息队列独立于发送与接收进程。进程终止时，消息队列及其内容并不会被删除。
+
+（3）消息队列可以实现消息的随机查询,消息不一定要以先进先出的次序读取,也可以按消息的类型读取。
+
+信号量是一个计数器，用于实现进程间的互斥和同步，其特点如下：
+
+（1）信号量用于进程间同步，若要在进程间传递数据需要结合共享内存。
+
+（2）信号量基于操作系统的 PV 操作，程序对信号量的操作都是原子操作。
+
+（3）每次对信号量的 PV 操作不仅限于对信号量值加1或减1，而且可以加减任意正整数。
+
+（4）支持信号量组。
+
+共享内存指的是两个或多个进程共享一个给定的存储区，其特点如下：
+
+（1）共享内存是最快的一种 IPC，因为进程是直接对内存进行存取。
+
+（2）因为多个进程可以同时操作，所以需要进行同步。
+
+（3）信号量+共享内存通常结合在一起使用，信号量用来同步对共享内存的访问。
 
 
 
