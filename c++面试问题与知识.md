@@ -5303,7 +5303,7 @@ volatile int i = 10;
 - const 可以是 volatile （如只读的状态寄存器）
 - 指针可以是 volatile
 
-49.初始化列表
+### 49.初始化列表
 
 [成员初始化列表](https://interview.huihut.com/#/?id=成员初始化列表)
 
@@ -5314,6 +5314,63 @@ volatile int i = 10;
   1. **常量成员**，因为常量只能初始化不能赋值，所以必须放在初始化列表里面
   2. **引用类型**，引用必须在定义的时候初始化，并且不能重新赋值，所以也要写在初始化列表里面
   3. 没有默认构造函数的类类型，因为使用初始化列表可以不必调用默认构造函数来初始化
+
+### 50.std::bind
+
+C++11中提供了std::bind。bind()函数的意义就像它的函数名一样，==是用来绑定函数调用的某些参数的==。bind的思想实际上是一种延迟计算的思想，将可调用对象保存起来，然后在需要的时候再调用。==而且这种绑定是非常灵活的，不论是普通函数、函数对象、还是成员函数都可以绑定==，而且其参数可以支持占位符。
+
+std::bind函数常用大约有两种函数原型，定义如下： 
+
+```c++
+template< class F, class... Args >
+/*unspecified*/ bind( F&& f, Args&&... args );
+
+template< class R, class F, class... Args >
+/*unspecified*/ bind( F&& f, Args&&... args );
+```
+
+可将std::bind函数看作一个通用的函数适配器，它接受一个可调用对象，生成一个新的可调用对象来“适应”原对象的参数列表。std::bind将可调用对象与其参数一起进行绑定，绑定后的结果可以使用std::function保存。
+
+std::bind绑定普通函数：
+
+```c++
+double Func (double x, double y) {return x + y;}
+auto NewFunc = std::bind (Func, std::placeholders::_1, 2);  
+std::cout << NewFunc(5) << endl;  
+```
+
+bind的第一个参数是函数名，普通函数做实参时，会隐式转换成函数指针。因此std::bind (Func,_1,2)等价于std::bind (&Func,_1,2)；
+_1表示占位符，位于`<functional>`中，std::placeholders::_1；
+
+std::bind绑定一个成员函数：
+
+```c++
+class Base
+{
+    void Add(int a, int b)
+    {
+        std::cout << a + b << endl;
+    }
+};
+int main() 
+{
+    Base base;
+    auto NewFunc = std::bind(&Base::Add, &base, 10, std::placeholders::_1);
+    f(20);
+}
+```
+
+bind绑定类成员函数时，==第一个参数表示对象的成员函数的指针，第二个参数表示对象的地址。==
+必须显示的指定&Base::Add，因为编译器不会将对象的成员函数隐式转换成函数指针，所以必须在Base::Add前添加&；
+使用对象成员函数的指针时，必须要知道该指针属于哪个对象，因此第二个参数为对象的地址 &base；
+
+默认情况下，bind的那些不是占位符的参数被拷贝到bind返回的可调用对象中。但是，与lambda类似，有时对有些绑定的参数希望以引用的方式传递，或是要绑定参数的类型无法拷贝。
+
+// 有些参数不能拷贝，或者希望传递给bind一个对象引用而不拷贝它时，
+//就必须使用标准库提供的ref函数。
+bind(Func, ref(A), _1, 10);
+
+
 
 
 ## 四. 操作系统
