@@ -4309,7 +4309,7 @@ static_cast < type-id > ( expression )
 
 ### 40.override和final
 
-override：必须重载。在函数后面加上override代表此函数重载了父类的同名虚函数。
+override：必须重载。==在函数后面加上override代表此函数重载了父类的同名虚函数。==
 
 final：不希望被继承或重载。
 
@@ -5510,6 +5510,309 @@ void fcn(int i){/*.....*/}//错误：重复定义了fcn
 要尽量使用常量引用
 
 （6）数组形参和const
+
+### 53.仿函数
+
+仿函数是C++中一个强大的解决问题的手段，对于初学者来说这个词可能比较陌生，但是如果你学习过C++的STL，你可能对这个词就不陌生了，也或许你已经在使用C++中预定义的默认仿函数只是你不知道它而已。下面这篇文章就为你揭开仿函数的神秘面纱，也希望通过这篇文章的学习，能够帮助你提高工作的效率。
+
+#### 1、仿函数介绍
+
+仿函数概念：
+仿函数是定义了一个含有operator()成员函数的对象，可以视为一个一般的函数，只不过这个函数功能是在一个类中的运算符operator()中实现，是一个函数对象，它将函数作为参数传递的方式来使用。
+
+#### 2、仿函数的优缺点
+
+优点：
+1）仿函数比函数指针的执行速度快，函数指针时通过地址调用，而仿函数是对运算符operator进行自定义来提高调用的效率。
+2）仿函数比一般函数灵活，可以同时拥有两个不同的状态实体，一般函数不具备此种功能。
+3）仿函数可以作为模板参数使用，因为每个仿函数都拥有自己的类型。
+缺点：
+1）需要单独实现一个类。
+2）定义形式比较复杂。
+
+#### 3、仿函数作用
+
+仿函数通常有下面四个作用：
+1）作为排序规则，在一些特殊情况下排序是不能直接使用运算符<或者>时，可以使用仿函数。
+2）作为判别式使用，即返回值为bool类型。
+3）同时拥有多种内部状态，比如返回一个值得同时并累加。
+4）作为算法for_each的返回值使用。
+
+二、仿函数使用代码示例
+1、仿函数作为排序规则示例
+
+```c++
+// functionObject.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
+//
+
+#include <iostream>
+#include <string>
+#include <set>
+
+using namespace std;
+
+// 学生的名字和分数
+class Student
+{
+public:
+	string getName()
+	{
+		return m_name;
+	};
+int getScore()
+{
+	return m_score;
+}
+    public:
+	string m_name;
+	int m_score;;
+};
+
+// 根据学生的名字进行排序
+class StudentSortRule
+{
+public:
+	bool operator()(Student S1, Student S2)
+	{
+		return (S1.getName() < S2.getName());
+	};
+};
+
+int main()
+{
+	cout << "----------------仿函数作为排序规则使用--------------" << endl;
+	typedef set<Student, StudentSortRule> StudentSet;
+	StudentSet stuSet;
+	stuSet.clear();
+	Student stuJack;
+	stuJack.m_name = "Jack";
+	stuJack.m_score = 80;
+
+	Student stuToby;
+	stuToby.m_name = "Toby";
+	stuToby.m_score = 90;
+	
+	Student stuISmileLi;
+	stuISmileLi.m_name = "ISmileLi";
+	stuISmileLi.m_score = 100;
+	
+	// 插入数值
+	stuSet.insert(stuJack);
+	stuSet.insert(stuToby);
+	stuSet.insert(stuISmileLi);
+	
+	// 打印查看
+	StudentSet::iterator iter;
+	for (iter=stuSet.begin(); iter!=stuSet.end(); iter++)
+	{
+		cout << "Name: " << (*iter).m_name << "Score: " << (*iter).m_score << endl;
+	}
+	
+	std::cout << "Hello World!\n";
+	getchar();
+
+}
+```
+
+运行结果：
+
+2、作为判别式示例
+
+```c++
+// functionBool.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
+//
+
+#include <iostream>
+#include <algorithm>
+#include <list>
+using namespace std;
+
+// 删除符合条件的数值
+class RmNum 
+{
+private:
+	int m_num;
+	int m_count;
+
+public:
+	RmNum(int n) :m_num(n), m_count(0)
+	{
+	}
+bool operator()(int)
+{	
+	return ++m_count == m_num;
+}
+    };
+
+// 打印
+void myPrintf(list<int>& lt)
+{
+	list<int>::iterator it;
+	for (it = lt.begin(); it != lt.end(); it++)
+	{
+		cout << *it << "  ";
+	}
+	cout << endl;
+}
+
+int main()
+{
+	cout << "----------------仿函数作为判别式使用--------------" << endl;
+	cout << "----------------list中插入数值--------------" << endl;
+	list<int> tmpList;
+	for (int i = 0; i < 9; i++)
+	{
+		tmpList.emplace_back(i);
+	}
+	cout << "----------------打印list中插入的数值--------------" << endl;
+	myPrintf(tmpList);
+
+	cout << "----------------删除list中符合条件的数值--------------" << endl;
+	list<int>::iterator pos;
+	pos = remove_if(tmpList.begin(), tmpList.end(), RmNum(2));
+	tmpList.erase(pos, tmpList.end());
+	cout << "----------------打印删除后list中的数值--------------" << endl;
+	myPrintf(tmpList);
+	std::cout << "Hello World!\n";
+	getchar();
+
+}
+
+
+```
+
+运行结果：
+
+3、拥有内部状态示例
+
+```c++
+// functionState.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
+//
+
+#include <iostream>
+#include <algorithm>
+#include <list>
+
+using namespace std;
+
+
+
+class mySequence
+{
+private:
+	int m_value;
+
+public:
+	mySequence(int ivalue) :m_value(ivalue)
+	{
+	}
+int operator()()
+{
+	return m_value++;
+}
+};
+
+void myPrintf(list<int>& lt)
+{
+	list<int>::iterator it;
+	for (it = lt.begin(); it != lt.end(); it++)
+	{
+		cout << *it << " , ";
+	}
+	cout << endl;
+}
+
+int main()
+{
+	cout << "----------------仿函数拥有内部状态--------------" << endl;
+	cout << "----------------list中插入数值--------------" << endl;
+	list<int> tmpList;
+	cout << "----------------从1开始序列化list--------------" << endl;
+	generate_n(back_inserter(tmpList), 9, mySequence(1));
+	myPrintf(tmpList);
+	cout << "----------------从10开始序列化list--------------" << endl;
+	generate(tmpList.begin(), tmpList.end(), mySequence(10));
+	myPrintf(tmpList);
+	std::cout << "Hello World!\n";
+	getchar();
+}
+```
+
+
+
+运行结果：
+
+4、作为算法for_each的返回值示例
+
+```c++
+// functionForEach.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
+//
+
+#include <iostream>
+#include <algorithm>
+#include <vector>
+
+using namespace std;
+
+class AverageValue 
+{
+private:
+	int m_num;
+	int m_sum;
+
+public:
+	AverageValue() :m_num(0), m_sum(0)
+	{
+}
+
+void operator()(int elem)
+{
+	m_num++;
+	m_sum += elem;
+}
+
+double value()
+{
+	return static_cast<double>(m_sum*1.0 / m_num);
+}
+    };
+
+void myPrintf(vector<int>& v)
+{
+	vector<int>::iterator it;
+	for (it = v.begin(); it != v.end(); it++)
+	{
+		cout << *it << " , ";
+	}
+	cout << endl;
+}
+
+int main()
+{
+	cout << "----------------仿函数作为算法for_each的返回值使用--------------" << endl;
+	
+
+	vector<int> tmpVector;
+	cout << "----------------vector中插入数值--------------" << endl;
+	for (int i=0; i<10; i++)
+	{
+		tmpVector.emplace_back(i);
+	}
+	cout << "----------------打印vector中插入的数值--------------" << endl;
+	myPrintf(tmpVector);
+	
+	cout << "----------------打印vector中插入的数值--------------" << endl;
+	AverageValue averValue = for_each(tmpVector.begin(), tmpVector.end(), AverageValue());
+	cout << "AverageValue: " << averValue.value() << endl;
+	
+	std::cout << "Hello World!\n";
+	getchar();
+
+}
+```
+运行结果：
+
+
 
 
 
